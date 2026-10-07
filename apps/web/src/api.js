@@ -38,6 +38,13 @@ export const api = {
   logout: () => req("/auth/logout", body("POST", {})),
   profile: () => req("/profile"),
   saveProfile: (value) => req("/profile", body("PATCH", value)),
+  profileStats: () => req("/profile-stats"),
+  changePassword: (value) => req("/profile/password", body("PATCH", value)),
+  exchange: (value, key) =>
+    req("/exchange", {
+      ...body("POST", value),
+      headers: { "Idempotency-Key": key },
+    }),
   contacts: () => req("/contacts"),
   cards: () => req("/cards"),
   requisites: (id) => req("/cards/" + encodeURIComponent(id) + "/requisites"),

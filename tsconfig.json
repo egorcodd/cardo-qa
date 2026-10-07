@@ -8,12 +8,9 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "types": [
-      "node"
-    ]
+    "types": ["node"],
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
   },
-  "include": [
-    "services/**/*.ts",
-    "packages/**/*.ts"
-  ]
+  "include": ["services/**/*.ts", "packages/**/*.ts"]
 }

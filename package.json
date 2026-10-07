@@ -11,9 +11,9 @@
   },
   "scripts": {
     "build": "vite build --config apps/web/vite.config.js && node scripts/build-pwa.mjs",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && node scripts/check-web.mjs",
     "test": "node --test tests/*.test.mjs",
-    "test:integration": "node --test tests/integration.mjs",
+    "test:integration": "node --test tests/integration.mjs tests/screens-integration.mjs tests/architecture-integration.mjs",
     "dev": "node scripts/dev.mjs",
     "start": "node services/gateway/index.ts"
   },

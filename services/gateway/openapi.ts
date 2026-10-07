@@ -19,13 +19,40 @@ const routes = [
   ],
   ["post", "/auth/logout", "Выход", {}],
   ["get", "/profile", "Профиль"],
-  ["patch", "/profile", "Изменить имя", { name: "Алексей" }],
+  [
+    "patch",
+    "/profile",
+    "Изменить профиль",
+    {
+      name: "Алексей",
+      email: "alex@cardo.test",
+      birth: "1998-03-14",
+      avatarTone: "lime",
+    },
+  ],
+  [
+    "patch",
+    "/profile/password",
+    "Сменить пароль и завершить сессии",
+    {
+      currentPassword: "Cardo2026!",
+      password: "NewCardo2026!",
+      confirmPassword: "NewCardo2026!",
+    },
+  ],
+  ["get", "/profile-stats", "Статистика аккаунта"],
+  [
+    "post",
+    "/exchange",
+    "Обмен между своими счетами",
+    { from: "RUB", to: "USD", amount: "100.00" },
+  ],
   ["get", "/settings", "Настройки"],
   [
     "put",
     "/settings",
     "Сохранить настройки",
-    { language: "ru", theme: "dark", mainCardId: "k1" },
+    { language: "ru", hideBalance: false, mainCardId: "k1" },
   ],
   ["get", "/cards", "Мои карты"],
   ["post", "/cards", "Выпустить карту", { currency: "RUB", tone: "lime" }],
@@ -51,7 +78,7 @@ const routes = [
       idempotencyKey: "replace-with-a-new-uuid",
     },
   ],
-  ["get", "/rates", "Курсы для примера"],
+  ["get", "/rates", "Курсы Cardo из сервиса Rates"],
   ["get", "/rewards", "Награды"],
   ["post", "/rewards/{id}/claim", "Получить награду", {}],
   ["get", "/notifications", "Уведомления"],
@@ -108,6 +135,15 @@ for (const [method, path, summary, body] of routes) {
         "application/json": { schema: { type: "object" }, example: body },
       },
     };
+  if (path === "/exchange")
+    item.parameters = [
+      {
+        in: "header",
+        name: "Idempotency-Key",
+        required: true,
+        schema: { type: "string", pattern: "^ex-[\\w-]{8,80}$" },
+      },
+    ];
   if (path === "/transactions")
     item.parameters = [
       {

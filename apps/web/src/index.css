@@ -1962,34 +1962,6 @@ html {
 :root {
   --nav-fade: rgba(241, 242, 244, 0.92);
 }
-:root[data-theme="dark"] {
-  --bg: #17191e;
-  --surface: #21242b;
-  --soft: #2d313b;
-  --ink: #f1f2f4;
-  --muted: #a0a5b2;
-  --line: #333844;
-  --dark: #0d0f14;
-  --shadow: 0 0 0 1px rgba(255, 255, 255, 0.06);
-  --nav-fade: rgba(23, 25, 30, 0.92);
-  --pos: #57d58f;
-  --neg: #f17b68;
-}
-@media (prefers-color-scheme: dark) {
-  :root[data-theme="system"] {
-    --bg: #17191e;
-    --surface: #21242b;
-    --soft: #2d313b;
-    --ink: #f1f2f4;
-    --muted: #a0a5b2;
-    --line: #333844;
-    --dark: #0d0f14;
-    --shadow: 0 0 0 1px rgba(255, 255, 255, 0.06);
-    --nav-fade: rgba(23, 25, 30, 0.92);
-    --pos: #57d58f;
-    --neg: #f17b68;
-  }
-}
 .topnav {
   background: linear-gradient(
     180deg,

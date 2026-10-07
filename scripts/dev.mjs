@@ -3,6 +3,7 @@ const entries = [
   "services/customer/index.ts",
   "services/banking/index.ts",
   "services/engagement/index.ts",
+  "services/rates/index.ts",
   "services/gateway/index.ts",
 ];
 const children = entries.map((entry) =>
@@ -13,10 +14,21 @@ const children = entries.map((entry) =>
 );
 for (const child of children)
   child.on("exit", (code) => {
-    if (code) {
-      for (const other of children) other.kill();
-      process.exitCode = code;
-    }
+    if (code)
+      console.error(
+        JSON.stringify({
+          level: "error",
+          message: "Service stopped",
+          pid: child.pid,
+          code,
+        }),
+      );
+    if (
+      children.every(
+        (item) => item.exitCode !== null || item.signalCode !== null,
+      )
+    )
+      process.exitCode = code || 0;
   });
 for (const signal of ["SIGINT", "SIGTERM"])
   process.on(signal, () => {

@@ -156,10 +156,30 @@ export async function upstream(
   });
   return response;
 }
-export function listen(app: ReturnType<typeof express>, port: number) {
+export function listen(
+  app: ReturnType<typeof express>,
+  port: number,
+  cleanup: () => Promise<void> = async () => {},
+) {
   const server = app.listen(port, process.env.HOST || "0.0.0.0", () =>
     console.log(JSON.stringify({ level: "info", message: "listening", port })),
   );
-  process.on("SIGTERM", () => server.close(() => process.exit(0)));
+  let closing = false;
+  const shutdown = () => {
+    if (closing) return;
+    closing = true;
+    server.close(async () => {
+      try {
+        await cleanup();
+        process.exitCode = 0;
+      } catch (error) {
+        console.error(error);
+        process.exitCode = 1;
+      }
+    });
+    server.closeIdleConnections();
+  };
+  process.once("SIGTERM", shutdown);
+  process.once("SIGINT", shutdown);
   return server;
 }

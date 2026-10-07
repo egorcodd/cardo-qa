@@ -10,6 +10,7 @@ export function readRoute() {
     "settings",
     "rewards",
     "notifications",
+    "exchange",
   ];
   return {
     view: allowed.includes(view) ? view : "home",

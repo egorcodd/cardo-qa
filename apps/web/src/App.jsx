@@ -4,19 +4,28 @@ import TopNav from "./components/TopNav.jsx";
 import ToastStack from "./components/Toast.jsx";
 import {
   SelectCard,
-  Success,
-  FaqModal,
   CardDetails,
-  TxDetails,
-  Receive,
-  Limits,
   NewCard,
-} from "./components/Overlays.jsx";
-import { Home, Send, History, Cards } from "./views/views.jsx";
-import { Profile, Settings, Rewards, Notifications } from "./views/Account.jsx";
+} from "./components/overlays/cards.jsx";
+import {
+  Receive,
+  Success,
+  TxDetails,
+  Limits,
+} from "./components/overlays/payments.jsx";
+import { FaqModal } from "./components/overlays/support.jsx";
+import { Home } from "./views/Home.jsx";
+import { Send } from "./views/Send.jsx";
+import { History } from "./views/History.jsx";
+import { Cards } from "./views/Cards.jsx";
+import { Profile } from "./views/Profile.jsx";
+import { Settings } from "./views/Settings.jsx";
+import { Rewards } from "./views/Rewards.jsx";
+import { Notifications } from "./views/Notifications.jsx";
 import { useLang } from "./i18n.jsx";
 import { api } from "./api.js";
 import { useRoute } from "./route.js";
+import Exchange from "./views/Exchange.jsx";
 import { registerWorker, disablePush } from "./pwa.js";
 export default function App() {
   const { t, lang, setLang } = useLang();
@@ -55,8 +64,13 @@ export default function App() {
   function applyProfile(p) {
     setProfile(p);
     setLang(p.language);
-    document.documentElement.dataset.theme = p.theme;
-    localStorage.setItem("cardo_theme", p.theme);
+    document.documentElement.dataset.theme = "light";
+    try {
+      localStorage.setItem(
+        "cardo_last_account",
+        JSON.stringify({ name: p.name, phone: p.phone }),
+      );
+    } catch {}
   }
   async function load(p) {
     setLoadErr("");
@@ -167,13 +181,14 @@ export default function App() {
     setCards(c);
     setTxns(transactions);
   }
-  async function saveSettings(values) {
+  async function saveSettings(values, rethrow = false) {
     try {
       const p = await api.saveSettings(values);
       applyProfile(p);
       notify(w("Настройки сохранены", "Settings saved"));
     } catch (e) {
       notify(e.message, "close");
+      if (rethrow) throw e;
     }
   }
   async function pick(id) {
@@ -301,6 +316,7 @@ export default function App() {
             {route.view === "home" && (
               <Home
                 balance={card.balance}
+                hideBalance={profile.hideBalance}
                 cur={card.cur}
                 contacts={contacts}
                 txns={txns}
@@ -343,9 +359,21 @@ export default function App() {
                 )}
               </p>
             )}
+            {route.view === "exchange" && (
+              <Exchange
+                cards={cards}
+                onRefresh={refresh}
+                notify={notify}
+                online={online}
+              />
+            )}
             {route.view === "profile" && (
               <Profile
                 profile={profile}
+                go={go}
+                onLimits={() => setLimits(true)}
+                onLogout={logout}
+                notify={notify}
                 onSave={async (values) => {
                   const p = await api.saveProfile(values);
                   applyProfile(p);
@@ -356,7 +384,8 @@ export default function App() {
             {route.view === "settings" && (
               <Settings
                 profile={profile}
-                onSave={saveSettings}
+                onSave={(values) => saveSettings(values, true)}
+                onPasswordChanged={logout}
                 notify={notify}
                 install={
                   installPrompt
