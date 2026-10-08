@@ -1,0 +1,11 @@
+CREATE TABLE IF NOT EXISTS engagement.memberships(user_id uuid PRIMARY KEY,expires_at timestamptz);
+INSERT INTO engagement.memberships(user_id,expires_at) SELECT user_id,created_at+interval '30 days' FROM engagement.redemptions WHERE reward_id='plus' ON CONFLICT DO NOTHING;
+CREATE TABLE IF NOT EXISTS engagement.provisions(user_id uuid PRIMARY KEY,demo boolean NOT NULL,created_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS engagement.notification_preferences(user_id uuid PRIMARY KEY,transactions boolean NOT NULL DEFAULT true,service boolean NOT NULL DEFAULT true,offers boolean NOT NULL DEFAULT false);
+ALTER TABLE engagement.notifications ADD COLUMN IF NOT EXISTS category text NOT NULL DEFAULT 'service' CHECK(category IN ('transactions','service','offers'));
+UPDATE engagement.notifications SET category='transactions' WHERE kind='transfer' AND category='service';
+DELETE FROM engagement.subscriptions WHERE id IN (SELECT id FROM (SELECT id,row_number() OVER(PARTITION BY endpoint ORDER BY created_at DESC,id DESC) position FROM engagement.subscriptions) ranked WHERE position>1);
+CREATE UNIQUE INDEX IF NOT EXISTS subscriptions_endpoint ON engagement.subscriptions(endpoint);
+CREATE TABLE IF NOT EXISTS engagement.reminders(id uuid PRIMARY KEY,user_id uuid NOT NULL,message text NOT NULL CHECK(length(message) BETWEEN 1 AND 280),scheduled_at timestamptz NOT NULL,idempotency_key text,status text NOT NULL DEFAULT 'scheduled' CHECK(status IN ('scheduled','delivered','cancelled')),created_at timestamptz NOT NULL DEFAULT now(),delivered_at timestamptz,cancelled_at timestamptz,notification_id uuid REFERENCES engagement.notifications(id) ON DELETE SET NULL,UNIQUE(user_id,idempotency_key));
+CREATE INDEX IF NOT EXISTS reminders_due ON engagement.reminders(scheduled_at) WHERE status='scheduled';
+CREATE INDEX IF NOT EXISTS reminders_user ON engagement.reminders(user_id,created_at DESC);

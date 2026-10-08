@@ -6,7 +6,7 @@ export default function BankCard({ c, main, onClick, bal }) {
   const { t } = useLang();
   return (
     <button
-      className={"bcard tone-" + c.tone + (main ? " sel" : "")}
+      className={"bcard tone-" + c.tone + (main ? " sel" : "") + (c.frozen ? " frozen" : "")}
       onClick={onClick}
     >
       <span className="bcard-wm">Cardo</span>
@@ -17,10 +17,10 @@ export default function BankCard({ c, main, onClick, bal }) {
       <div className="bcard-bal">{money(bal ?? c.balance, c.cur)}</div>
       <div className="bcard-foot">
         <span className="bcard-num">•••• {c.num}</span>
-        {main && (
-          <span className="bcard-main">
-            <Icon name="check" size={13} />
-            {t("cards.main")}
+        {(main || c.frozen) && (
+          <span className={"bcard-main" + (c.frozen ? " bcard-frozen" : "")}>
+            <Icon name={c.frozen ? "freeze" : "check"} size={13} />
+            {c.frozen ? t("cards.frozen") : t("cards.main")}
           </span>
         )}
       </div>

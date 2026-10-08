@@ -1,11 +1,26 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { api } from "../api.js";
 import { useLang } from "../i18n.jsx";
 import Icon from "../icons.jsx";
+import { Coins, Crown } from "lucide-react";
 import Dialog from "../components/Dialog.jsx";
-export function Rewards({ notify }) {
+function RewardSymbol({ id, size = 24 }) {
+  if (id === "plus")
+    return <Crown size={size} strokeWidth={1.8} aria-hidden="true" />;
+  if (id === "cashback")
+    return <Coins size={size} strokeWidth={1.8} aria-hidden="true" />;
+  return <Icon name={id === "travel" ? "plane" : "gift"} size={size} />;
+}
+export function Rewards({ notify, onRefresh, membership }) {
   const { lang } = useLang(),
     w = (ru, en) => (lang === "en" ? en : ru);
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
   const [data, setData] = useState(null),
     [error, setError] = useState(""),
     [pending, setPending] = useState(false),
@@ -13,10 +28,13 @@ export function Rewards({ notify }) {
     [claimed, setClaimed] = useState(false);
   async function load() {
     try {
-      setData(await api.rewards());
-      setError("");
+      const value = await api.rewards();
+      if (alive.current) {
+        setData(value);
+        setError("");
+      }
     } catch (e) {
-      setError(e.message);
+      if (alive.current) setError(e.message);
     }
   }
   useEffect(() => {
@@ -27,6 +45,8 @@ export function Rewards({ notify }) {
     setPending(true);
     try {
       const result = await api.claimReward(selected.id);
+      if (!alive.current) return;
+      onRefresh?.().catch(() => {});
       setData((d) => ({
         ...d,
         balance: result.balance,
@@ -37,9 +57,9 @@ export function Rewards({ notify }) {
       setClaimed(true);
       notify(w("Награда получена", "Reward received"), "gift");
     } catch (e) {
-      notify(e.message, "close");
+      if (alive.current) notify(e.message, "close");
     } finally {
-      setPending(false);
+      if (alive.current) setPending(false);
     }
   }
   const title = selected
@@ -62,9 +82,16 @@ export function Rewards({ notify }) {
       ) : (
         <>
           <section className="rewards-wallet">
+            <span className="reward-wallet-symbol" aria-hidden="true">
+              <Coins size={42} strokeWidth={1.6} />
+            </span>
             <span className="badge-lime">
-              <Icon name="sparkles" size={14} />
-              {w("Cardo Плюс", "Cardo Plus")}
+              {membership?.premium && (
+                <Crown size={14} strokeWidth={1.8} aria-hidden="true" />
+              )}
+              {membership?.premium
+                ? w("Cardo Плюс", "Cardo Plus")
+                : w("Награды Cardo", "Cardo Rewards")}
             </span>
             <div className="reward-points">{data.balance}</div>
             <div className="bal-label">{w("Твои баллы", "Your points")}</div>
@@ -74,12 +101,6 @@ export function Rewards({ notify }) {
                 "Every completed transfer earns 5 points.",
               )}
             </p>
-            <span className="wallet-star star-one">
-              <Icon name="sparkles" size={22} />
-            </span>
-            <span className="wallet-star star-two">
-              <Icon name="sparkles" size={15} />
-            </span>
           </section>
           <section className="set-card">
             {data.items.map((item) => (
@@ -91,15 +112,8 @@ export function Rewards({ notify }) {
                   setClaimed(item.claimed);
                 }}
               >
-                <span className="set-ico">
-                  <Icon
-                    name={
-                      { plus: "sparkles", cashback: "gift", travel: "plane" }[
-                        item.id
-                      ]
-                    }
-                    size={22}
-                  />
+                <span className={"set-ico reward-icon reward-icon-" + item.id}>
+                  <RewardSymbol id={item.id} size={24} />
                 </span>
                 <span>
                   <span className="set-t">
@@ -136,11 +150,17 @@ export function Rewards({ notify }) {
             ))}
           </div>
           <div className="rw-circle">
-            <Icon name={claimed ? "check" : "gift"} size={claimed ? 46 : 42} />
+            {claimed ? (
+              <Icon name="check" size={46} />
+            ) : (
+              <RewardSymbol id={selected?.id} size={42} />
+            )}
           </div>
         </div>
         <span className="badge-lime">
-          {claimed ? w("Награда получена", "Reward received") : "Cardo Плюс"}
+          {claimed
+            ? w("Награда получена", "Reward received")
+            : w("Награды Cardo", "Cardo Rewards")}
         </span>
         <h2 className="rw-title">{title}</h2>
         <div className="suc-amount">

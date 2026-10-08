@@ -17,6 +17,12 @@ export function createAuthRoutes(pool: Pool) {
         pw !== req.body.confirmPassword
       )
         fail(422, "PASSWORD_MISMATCH", "Пароли не совпадают");
+      if (["+79990001001", "+79990001002"].includes(p))
+        fail(
+          409,
+          "PHONE_RESERVED",
+          "Этот номер используется тестовым аккаунтом",
+        );
       const salt = randomBytes(16).toString("hex");
       const key = (await scrypt(pw, salt, 64)) as Buffer;
       let user;

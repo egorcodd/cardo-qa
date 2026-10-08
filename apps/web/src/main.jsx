@@ -6,7 +6,7 @@ import "./index.css";
 import "./screens.css";
 
 document.documentElement.dataset.theme = "light";
-localStorage.removeItem("cardo_theme");
+document.documentElement.style.colorScheme = "light";
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <LangProvider>

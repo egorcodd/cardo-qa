@@ -19,14 +19,6 @@ export const PROFILE_MENU = [
   { id: "exit", key: "menu.exit", icon: "exit", danger: true },
 ];
 
-export const INIT_BALANCE = 521098.31;
-
-export const CREDIT = {
-  name: "Кредитная карта Cardo",
-  debt: 12480.0,
-  limit: 100000,
-};
-
 export function fmt(n, dec = 2) {
   return n.toLocaleString("ru-RU", {
     minimumFractionDigits: dec,

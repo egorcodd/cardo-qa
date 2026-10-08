@@ -2,6 +2,8 @@ import {
   House,
   Clock3,
   RussianRuble,
+  DollarSign,
+  Euro,
   ArrowUpRight,
   ArrowDownLeft,
   Plus,
@@ -9,6 +11,7 @@ import {
   Check,
   X,
   ChevronRight,
+  ChevronLeft,
   ChevronDown,
   CircleHelp,
   Gift,
@@ -36,11 +39,19 @@ import {
   ShieldCheck,
   Plane,
   LockKeyhole,
+  Star,
+  Sun,
+  Moon,
+  Circle,
+  Landmark,
+  CalendarDays,
 } from "lucide-react";
 const icons = {
   home: House,
   clock: Clock3,
   ruble: RussianRuble,
+  dollar: DollarSign,
+  euro: Euro,
   send: ArrowUpRight,
   receive: ArrowDownLeft,
   plus: Plus,
@@ -48,6 +59,7 @@ const icons = {
   check: Check,
   close: X,
   chevronr: ChevronRight,
+  chevronl: ChevronLeft,
   chevrond: ChevronDown,
   help: CircleHelp,
   gift: Gift,
@@ -77,9 +89,14 @@ const icons = {
   shield: ShieldCheck,
   plane: Plane,
   lock: LockKeyhole,
+  star: Star,
+  sun: Sun,
+  moon: Moon,
+  bank: Landmark,
+  calendar: CalendarDays,
 };
 export default function Icon({ name, size = 20, strokeWidth = 1.8, ...rest }) {
-  const Component = icons[name] || CircleHelp;
+  const Component = icons[name] || Circle;
   return (
     <Component
       size={size}
@@ -107,11 +124,14 @@ export function PayMark({ light }) {
 
 export function BrandMark() {
   return (
-    <span className="cardo-brand-mark" aria-hidden="true">
-      <svg viewBox="0 0 36 22">
-        <circle cx="14" cy="11" r="9" fill="#caf23f" />
-        <circle cx="22" cy="11" r="9" fill="#fff" opacity=".55" />
-      </svg>
-    </span>
+    <img
+      className="cardo-brand-mark"
+      src="/logo.png"
+      width="28"
+      height="28"
+      alt=""
+      aria-hidden="true"
+      draggable="false"
+    />
   );
 }

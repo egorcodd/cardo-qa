@@ -60,6 +60,7 @@ services:
       PORT: 8082
       DATABASE_URL: postgres://cardo_banking:cardo_banking_dev@postgres:5432/cardo
       ENGAGEMENT_URL: http://engagement:8083
+      CUSTOMER_URL: http://customer:8081
       RATES_URL: http://rates:8084
   engagement:
     <<: *app

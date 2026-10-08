@@ -9,6 +9,7 @@ import { createAuthRoutes } from "./features/auth.ts";
 import { createProfileRoutes } from "./features/profile.ts";
 import { createPasswordRoutes } from "./features/password.ts";
 import { createSettingsRoutes } from "./features/settings.ts";
+import { createDirectoryRoutes } from "./features/directory.ts";
 export function createCustomerApp(pool: Pool) {
   const app = service("customer");
   app.get(
@@ -19,6 +20,7 @@ export function createCustomerApp(pool: Pool) {
     }),
   );
   app.use(internal);
+  app.use(createDirectoryRoutes(pool));
   app.use(createAuthRoutes(pool));
   app.use(createProfileRoutes(pool));
   app.use(createPasswordRoutes(pool));

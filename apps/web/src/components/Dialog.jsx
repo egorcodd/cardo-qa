@@ -27,6 +27,9 @@ export default function Dialog({
     );
     const key = (e) => {
       if (e.key === "Escape") {
+        const popovers = [...(panel.current?.querySelectorAll('[data-cardo-popover="true"]') || [])];
+        const expanded = [...(panel.current?.querySelectorAll('[aria-expanded="true"][aria-controls]') || [])];
+        if (popovers.some(popover => expanded.some(trigger => trigger.getAttribute("aria-controls") === popover.id))) return;
         e.stopImmediatePropagation();
         if (!busy) close.current();
       }
@@ -35,7 +38,7 @@ export default function Dialog({
         ...(panel.current?.querySelectorAll(
           'button:not(:disabled),input:not(:disabled),select:not(:disabled),[tabindex="0"]',
         ) || []),
-      ];
+      ].filter(node => node.tabIndex !== -1 && node.getClientRects().length);
       if (!controls.length) {
         e.preventDefault();
         return;

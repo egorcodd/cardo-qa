@@ -51,13 +51,6 @@ export default function TopNav({
         </nav>
         <div className="tn-right">
           <button
-            className="tn-icobtn"
-            onClick={onFaq}
-            aria-label={t("faq.title")}
-          >
-            <Icon name="help" size={19} />
-          </button>
-          <button
             className="tn-icobtn notification-button"
             onClick={() => setView("notifications")}
             aria-label={lang === "ru" ? "Уведомления" : "Notifications"}

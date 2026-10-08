@@ -1,5 +1,6 @@
 import { useState } from "react";
 import Icon from "../icons.jsx";
+import ValidationMessage from "./ValidationMessage.jsx";
 export default function Field({
   id,
   title,
@@ -40,11 +41,7 @@ export default function Field({
           </button>
         )}
       </div>
-      {error && (
-        <p id={id + "-error"} className="fld-err" role="alert">
-          {error}
-        </p>
-      )}
+      <ValidationMessage id={id + "-error"} className="fld-err" message={error} />
     </div>
   );
 }

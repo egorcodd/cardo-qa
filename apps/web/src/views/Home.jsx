@@ -3,23 +3,14 @@ import Icon from "../icons.jsx";
 import { money } from "../data.js";
 
 import { useLang } from "../i18n.jsx";
-import { api } from "../api.js";
 import ScrollRow from "../components/ScrollRow.jsx";
-import Avatar from "../components/Avatar.jsx";
+import RecipientAvatar from "../components/RecipientAvatar.jsx";
+import { bankName, recipientBank, maskedRecipientReference } from "../banks.js";
 import OpRow from "../components/OperationRow.jsx";
 function RatesCard({ go }) {
   const { t } = useLang();
-  const [rates, setRates] = useState(null);
-  const [err, setErr] = useState("");
-
-  useEffect(() => {
-    api
-      .rates()
-      .then(setRates)
-      .catch((e) => setErr(e.message));
-  }, []);
   return (
-    <section className="card-soft">
+    <section className="card-soft home-rates">
       <div className="soft-head">
         <span>{t("rates.title")}</span>
         <button className="soft-link" onClick={() => go("exchange")}>
@@ -27,22 +18,10 @@ function RatesCard({ go }) {
           <Icon name="chevronr" size={14} />
         </button>
       </div>
-      {err && <div className="load-state load-err">{err}</div>}
-      {!err && !rates && (
-        <div className="load-state">
-          <span className="spinner" />
-          {t("common.loading")}
-        </div>
-      )}
-      {rates &&
-        Object.entries(rates.rates)
-          .filter(([currency]) => ["USD", "EUR"].includes(currency))
-          .map(([currency, rate]) => (
-            <div className="rate-row" key={currency}>
-              <span>{currency}</span>
-              <strong>{money(rate)}</strong>
-            </div>
-          ))}
+      <div className="load-state" role="status" aria-busy="true">
+        <span className="spinner" />
+        {t("common.loading")}
+      </div>
     </section>
   );
 }
@@ -53,9 +32,10 @@ export function Home({
   contacts,
   txns,
   go,
-  notify,
   onTx,
   onReceive,
+  onTopUp,
+  membership,
 }) {
   const { t, lang } = useLang();
   const [revealed, setRevealed] = useState(false);
@@ -85,15 +65,16 @@ export function Home({
             money(balance, cur)
           )}
         </div>
-        <div className="bal-hold">
-          {t("home.held")} · {money(2500, cur, 0)}
-        </div>
         <div className="bal-actions">
           <button className="pill" onClick={() => go("send")}>
             <Icon name="send" size={17} />
             {t("home.send")}
           </button>
-          <button className="pill" onClick={onReceive}>
+          <button className="pill" onClick={onTopUp}>
+            <Icon name="plus" size={17} />
+            {lang === "ru" ? "Пополнить" : "Top up"}
+          </button>
+          <button className="pill balance-receive" onClick={onReceive}>
             <Icon name="receive" size={17} />
             {t("home.receive")}
           </button>
@@ -102,30 +83,92 @@ export function Home({
 
       <div className="promo">
         <div>
-          <div className="promo-t">{t("home.promoT")}</div>
-          <div className="promo-s">{t("home.promoS")}</div>
+          <div className="promo-t">
+            {membership?.premium
+              ? lang === "ru"
+                ? "Cardo Плюс"
+                : "Cardo Plus"
+              : lang === "ru"
+                ? "Cardo Стандарт"
+                : "Cardo Standard"}
+          </div>
+          <div className="promo-s">
+            {lang === "ru"
+              ? "Переводи близким и управляй деньгами."
+              : "Send to people you know and manage your money."}
+          </div>
         </div>
-        <span className="promo-coin">₽</span>
+        <span className="promo-coin">
+          <Icon name="ruble" size={22} />
+        </span>
       </div>
 
       <RatesCard go={go} />
 
-      <section className="card-soft">
+      <section className="card-soft home-recipients">
         <div className="soft-head">
-          <span>{t("home.sendAgain")}</span>
-        </div>
-        <ScrollRow>
-          {contacts.map((c) => (
-            <button
-              className="person"
-              key={c.id}
-              onClick={() => go("/send?recipient=" + c.id)}
-            >
-              <Avatar c={c} />
-              <span className="person-n">{c.name}</span>
+          <span>{t("home.recipients")}</span>
+          {!!contacts.length && (
+            <button className="soft-link" onClick={() => go("send")}>
+              <Icon name="plus" size={14} />
+              {lang === "ru" ? "Новый перевод" : "New transfer"}
             </button>
-          ))}
-        </ScrollRow>
+          )}
+        </div>
+        {!contacts.length ? (
+          <button className="recipient-start" onClick={() => go("send")}>
+            <span className="recipient-start-icon">
+              <Icon name="user" size={22} />
+            </span>
+            <span className="recipient-start-copy">
+              <strong>
+                {lang === "ru" ? "Выбрать получателя" : "Choose recipient"}
+              </strong>
+              <span>
+                {lang === "ru"
+                  ? "По телефону или номеру карты"
+                  : "By phone or card number"}
+              </span>
+            </span>
+            <Icon name="chevronr" size={18} />
+          </button>
+        ) : (
+          <ScrollRow>
+            {contacts.map((c) => (
+              <button
+                className="person home-recipient"
+                key={c.id}
+                title={
+                  c.name +
+                  " · " +
+                  bankName(recipientBank(c), c.bankName) +
+                  " · " +
+                  c.acct
+                }
+                aria-label={
+                  (lang === "ru" ? "Перевести: " : "Send to: ") +
+                  c.name +
+                  ", " +
+                  bankName(recipientBank(c), c.bankName) +
+                  ", " +
+                  c.acct
+                }
+                onClick={() =>
+                  go("/send?recipient=" + encodeURIComponent(c.id))
+                }
+              >
+                <RecipientAvatar recipient={c} />
+                <span className="person-n">{c.name}</span>
+                <span className="recipient-reference">
+                  {bankName(recipientBank(c), c.bankName)}
+                </span>
+                <span className="recipient-reference">
+                  {maskedRecipientReference(c)}
+                </span>
+              </button>
+            ))}
+          </ScrollRow>
+        )}
       </section>
 
       <section className="card-soft">
@@ -135,6 +178,13 @@ export function Home({
             {t("home.seeAll")}
           </button>
         </div>
+        {!txns.length && (
+          <p className="field-help">
+            {lang === "ru"
+              ? "Операций пока нет. Пополни счёт, чтобы сделать первый перевод."
+              : "No transactions yet. Top up your account to make your first transfer."}
+          </p>
+        )}
         <div className="oplist">
           {txns.slice(0, 4).map((tx) => (
             <OpRow key={tx.id} t={tx} onClick={() => onTx(tx)} />

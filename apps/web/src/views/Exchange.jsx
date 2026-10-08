@@ -1,17 +1,20 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api.js";
+import { operationKey, savedAttempt, clearAttempt, uncertainError } from "../operationAttempt.js";
 import { useLang } from "../i18n.jsx";
 import Icon from "../icons.jsx";
 import Dialog from "../components/Dialog.jsx";
+import ValidationMessage from "../components/ValidationMessage.jsx";
 const currencies = {
   RUB: {
     symbol: "₽",
+    icon: "ruble",
     ru: "Российский рубль",
     en: "Russian ruble",
     tone: "lime",
   },
-  USD: { symbol: "$", ru: "Доллар США", en: "US dollar", tone: "dark" },
-  EUR: { symbol: "€", ru: "Евро", en: "Euro", tone: "violet" },
+  USD: { symbol: "$", icon: "dollar", ru: "Доллар США", en: "US dollar", tone: "dark" },
+  EUR: { symbol: "€", icon: "euro", ru: "Евро", en: "Euro", tone: "violet" },
 };
 const clean = (v) => v.replace(/\s/g, "").replace(",", ".");
 const cents = (v) => {
@@ -23,7 +26,7 @@ const cents = (v) => {
 const decimal = (n) =>
   String(n / 100n) + "." + String(n % 100n).padStart(2, "0");
 const convert = (n, a, b) => (n === null ? null : (n * a + b / 2n) / b);
-export default function Exchange({ cards, onRefresh, notify, online }) {
+export default function Exchange({ cards, onRefresh, notify, online, membership, accountId }) {
   const { lang } = useLang(),
     w = (ru, en) => (lang === "en" ? en : ru);
   const fmt = (n) =>
@@ -42,14 +45,14 @@ export default function Exchange({ cards, onRefresh, notify, online }) {
     [error, setError] = useState(""),
     [receipt, setReceipt] = useState(null),
     [turn, setTurn] = useState(false);
-  const attempt = useRef(null),
-    lock = useRef(false);
+  const lock = useRef(false), alive = useRef(true);
+  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   async function load() {
     try {
-      setRates(await api.rates());
-      setLoadError("");
+      const value = await api.rates();
+      if (alive.current) { setRates(value); setLoadError(""); }
     } catch (e) {
-      setLoadError(e.message);
+      if (alive.current) setLoadError(e.message);
     }
   }
   useEffect(() => {
@@ -76,11 +79,11 @@ export default function Exchange({ cards, onRefresh, notify, online }) {
       : null;
   const sourceCard = cards.find((c) => c.code === from),
     targetCard = cards.find((c) => c.code === to);
-  const unavailable =
-    source !== null && source > BigInt(sourceCard?.balanceMinor || 0);
+  const payload = { from, to, amount: source === null ? "" : decimal(source) };
+  const retry = !!savedAttempt(accountId, "exchange", payload);
+  const unavailable = source !== null && source > BigInt(sourceCard?.balanceMinor || 0) && !retry;
   const invalid = amount !== "" && typed === null;
   const inputError =
-    error ||
     (invalid
       ? w(
           "Введите сумму, до двух знаков после запятой",
@@ -114,21 +117,19 @@ export default function Exchange({ cards, onRefresh, notify, online }) {
     lock.current = true;
     setPending(true);
     setError("");
-    const payload = { from, to, amount: decimal(source) };
-    const fingerprint = JSON.stringify(payload);
-    if (attempt.current?.fingerprint !== fingerprint)
-      attempt.current = { fingerprint, key: "ex-" + crypto.randomUUID() };
+    const key = operationKey(accountId, "exchange", payload);
     try {
-      const result = await api.exchange(payload, attempt.current.key);
+      const result = await api.exchange(payload, key.startsWith("ex-") ? key : "ex-" + key);
+      clearAttempt(accountId, "exchange", payload);
+      if (!alive.current) return;
       setReceipt(result);
-      attempt.current = null;
-      await onRefresh();
+      onRefresh().catch(() => {});
     } catch (e) {
-      if (!e.network && e.status < 500) attempt.current = null;
-      setError(e.message);
+      if (!uncertainError(e)) clearAttempt(accountId, "exchange", payload);
+      if (alive.current) setError(e.message);
     } finally {
       lock.current = false;
-      setPending(false);
+      if (alive.current) setPending(false);
     }
   }
   function currencyButton(s, c) {
@@ -147,7 +148,7 @@ export default function Exchange({ cards, onRefresh, notify, online }) {
         }}
       >
         <span className={"cur-dot tone-" + currencies[c].tone}>
-          {currencies[c].symbol}
+          <Icon name={currencies[c].icon} size={16} />
         </span>
         {c}
         <Icon name="chevrond" size={15} />
@@ -174,11 +175,12 @@ export default function Exchange({ cards, onRefresh, notify, online }) {
     <div className="design-page anim">
       <div className="page-h exchange-heading">
         <h1 className="send-h">{w("Обмен валют", "Currency exchange")}</h1>
-        <span className="cv-upd">
-          <i />
-          {w("Курс Cardo", "Cardo rate")}
-        </span>
       </div>
+      <p className="field-help rate-source-note">
+        {w("Курс на ", "Rate for ") +
+          new Date(rates.asOf).toLocaleDateString(lang === "en" ? "en-GB" : "ru-RU", { timeZone: "UTC" })}
+        {rates.stale && " · " + w("Последний доступный курс", "Last available rate")}
+      </p>
       <section className={"cv" + (inputError ? " bad" : "")}>
         <div className="cv-row">
           <div className="cv-top">
@@ -211,11 +213,7 @@ export default function Exchange({ cards, onRefresh, notify, online }) {
             />
             {currencyButton("from", from)}
           </div>
-          {inputError && (
-            <p className="cv-err" id="exchange-error" role="alert">
-              {inputError}
-            </p>
-          )}
+          <ValidationMessage id="exchange-error" className="cv-err" message={inputError} />
         </div>
         <div className="cv-div">
           <button
@@ -289,7 +287,7 @@ export default function Exchange({ cards, onRefresh, notify, online }) {
         <div className="kv-row">
           <span>{w("Комиссия", "Fee")}</span>
           <b>
-            0 {currencies[from].symbol} <small>· Cardo Плюс</small>
+            0 {currencies[from].symbol} <small>· {membership?.premium ? w("Cardo Плюс", "Cardo Plus") : w("Cardo Стандарт", "Cardo Standard")}</small>
           </b>
         </div>
         <div className="kv-row">
@@ -297,6 +295,7 @@ export default function Exchange({ cards, onRefresh, notify, online }) {
           <b>{w("Сразу", "Instant")}</b>
         </div>
       </section>
+      <ValidationMessage message={error} />
       <button
         className={"btn-dark" + (pending ? " loading" : "")}
         disabled={pending || !source || !received || !!inputError || !online}
@@ -328,7 +327,7 @@ export default function Exchange({ cards, onRefresh, notify, online }) {
               }}
             >
               <span className={"op-ico tone-" + currencies[code].tone}>
-                {currencies[code].symbol}
+                <Icon name={currencies[code].icon} size={20} />
               </span>
               <span>
                 <span className="op-nm">{currencies[code][lang]}</span>
@@ -383,7 +382,9 @@ export default function Exchange({ cards, onRefresh, notify, online }) {
                   setError("");
                 }}
               >
-                <span className={"op-ico tone-" + c.tone}>{c.symbol}</span>
+                <span className={"op-ico tone-" + c.tone}>
+                  <Icon name={c.icon} size={20} />
+                </span>
                 <span>
                   <span className="op-nm">{c[lang]}</span>
                   <span className="op-cat">{code}</span>

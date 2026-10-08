@@ -95,19 +95,34 @@ test("profile, preferences, currency exchange and credential rotation", async (t
       );
     },
   );
+  assert.equal(
+    (
+      await call(
+        "/top-ups",
+        token,
+        "POST",
+        { cardId: "k1", amount: "5000" },
+        { "Idempotency-Key": randomUUID() },
+      )
+    ).status,
+    200,
+  );
   await t.test(
     "concurrent exchange debits once and creates balanced history entries",
     async () => {
       const before = (await call("/cards", token)).data,
         key = "ex-" + randomUUID(),
         body = { from: "RUB", to: "USD", amount: "925.00" };
+      const rates = (await call("/rates", token)).data;
+      const expectedMinor = BigInt(Math.round(925 / rates.rates.USD * 100));
+      const expectedReceived = String(expectedMinor / 100n) + "." + String(expectedMinor % 100n).padStart(2, "0");
       const [a, b] = await Promise.all([
         call("/exchange", token, "POST", body, { "Idempotency-Key": key }),
         call("/exchange", token, "POST", body, { "Idempotency-Key": key }),
       ]);
       assert.equal(a.status, 200);
       assert.deepEqual(a, b);
-      assert.equal(a.data.received, "10.00");
+      assert.equal(a.data.received, expectedReceived);
       const after = (await call("/cards", token)).data;
       assert.equal(
         BigInt(after.find((c) => c.code === "RUB").balanceMinor),
@@ -115,14 +130,14 @@ test("profile, preferences, currency exchange and credential rotation", async (t
       );
       assert.equal(
         BigInt(after.find((c) => c.code === "USD").balanceMinor),
-        BigInt(before.find((c) => c.code === "USD").balanceMinor) + 1000n,
+        BigInt(before.find((c) => c.code === "USD").balanceMinor) + expectedMinor,
       );
       const entries = (await call("/transactions", token)).data.filter((t) =>
         t.id.startsWith(a.data.id),
       );
       assert.equal(entries.length, 2);
       assert.equal(entries.find((t) => t.code === "RUB").amountMinor, "-92500");
-      assert.equal(entries.find((t) => t.code === "USD").amountMinor, "1000");
+      assert.equal(entries.find((t) => t.code === "USD").amountMinor, String(expectedMinor));
       assert.equal(
         (
           await call(

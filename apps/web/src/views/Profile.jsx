@@ -4,12 +4,14 @@ import { useLang } from "../i18n.jsx";
 import Icon from "../icons.jsx";
 import Dialog from "../components/Dialog.jsx";
 import Field from "../components/Field.jsx";
+import DatePicker, { birthDateBounds } from "../components/DatePicker.jsx";
 const phoneText = (p) =>
   p.replace(/^\+7(\d{3})(\d{3})(\d{2})(\d{2})$/, "+7 $1 $2-$3-$4");
 
-export function Profile({ profile, onSave, go, onLimits, onLogout, notify }) {
+export function Profile({ profile, membership, onSave, go, onLimits, onLogout, notify }) {
   const { lang } = useLang(),
     w = (ru, en) => (lang === "en" ? en : ru);
+  const plan = membership?.premium ? w("Cardo Плюс", "Cardo Plus") : w("Cardo Стандарт", "Cardo Standard");
   const [metrics, setMetrics] = useState(null),
     [metricError, setMetricError] = useState(false);
   const [edit, setEdit] = useState(null),
@@ -94,8 +96,9 @@ export function Profile({ profile, onSave, go, onLimits, onLogout, notify }) {
         <div className="prof-phone">{phoneText(profile.phone)}</div>
         <span className="badge-lime">
           <Icon name="sparkles" size={14} />
-          {profile.plan}
+          {plan}
         </span>
+        {membership?.premium && membership.expiresAt && <p className="membership-expiry">{w("Действует до ", "Valid until ") + new Date(membership.expiresAt).toLocaleDateString(lang === "en" ? "en-GB" : "ru-RU")}</p>}
         <div className="prof-stats">
           <div>
             <b>{metrics?.points ?? "…"}</b>
@@ -151,7 +154,7 @@ export function Profile({ profile, onSave, go, onLimits, onLogout, notify }) {
       </section>
       <button className="promo profile-promo" onClick={() => go("rewards")}>
         <span>
-          <span className="promo-t">{profile.plan}</span>
+          <span className="promo-t">{plan}</span>
           <span className="promo-s">
             {w(
               "Копи баллы за переводы и выбирай награды.",
@@ -237,15 +240,27 @@ export function Profile({ profile, onSave, go, onLimits, onLogout, notify }) {
                 </button>
               ))}
             </div>
+          ) : edit === "birth" ? (
+            <DatePicker
+              id="profile-edit"
+              title={titles.birth}
+              value={value}
+              onChange={(next) => {
+                setValue(next);
+                setError("");
+              }}
+              error={error}
+              lang={lang}
+              disabled={pending}
+              {...birthDateBounds()}
+            />
           ) : (
             <Field
               id="profile-edit"
               title={titles[edit]}
-              type={
-                edit === "birth" ? "date" : edit === "email" ? "email" : "text"
-              }
+              type={edit === "email" ? "email" : "text"}
               autoComplete={
-                edit === "birth" ? "bday" : edit === "name" ? "name" : "email"
+                edit === "name" ? "name" : "email"
               }
               value={value}
               onChange={(e) => {
@@ -253,11 +268,6 @@ export function Profile({ profile, onSave, go, onLimits, onLogout, notify }) {
                 setError("");
               }}
               maxLength={edit === "name" ? 60 : 254}
-              max={
-                edit === "birth"
-                  ? new Date().toISOString().slice(0, 10)
-                  : undefined
-              }
               error={error}
             />
           )}

@@ -6,7 +6,10 @@ import pg from "pg";
 import express from "express";
 import { createBankingApp } from "../services/banking/src/app.ts";
 import { createRatesClient } from "../services/banking/src/integrations/rates.ts";
+import { createCustomerClient } from "../services/banking/src/integrations/customer.ts";
+import { createMembershipClient } from "../services/banking/src/integrations/membership.ts";
 import { createRatesApp } from "../services/rates/src/app.ts";
+import { currentSnapshot } from "../services/rates/src/snapshots.ts";
 import { createGatewayApp } from "../services/gateway/src/app.ts";
 const defaults = {
   customer: process.env.CUSTOMER_URL || "http://127.0.0.1:8081",
@@ -51,14 +54,15 @@ async function request(base, route, token, body, extra = {}) {
 test("Real service boundaries, dependency failure and exchange replay", async (t) => {
   const banking = pool("banking"),
     rates = pool("rates");
-  const rateService = await listen(createRatesApp(rates));
+  let activeSnapshot = await currentSnapshot(rates);
+  const rateService = await listen(createRatesApp(rates, async () => activeSnapshot));
   let lastTrace = "";
   rateService.server.on("request", (req) => {
     if (req.url.startsWith("/internal/quotes"))
       lastTrace = req.headers["x-request-id"];
   });
   const bankService = await listen(
-    createBankingApp(banking, createRatesClient(rateService.url)),
+    createBankingApp(banking, createRatesClient(rateService.url), createCustomerClient(defaults.customer), createMembershipClient(defaults.engagement)),
   );
   const gateway = await listen(
     createGatewayApp(
@@ -81,7 +85,29 @@ test("Real service boundaries, dependency failure and exchange replay", async (t
   });
   assert.equal(registration.status, 201);
   const token = registration.data.token;
+  assert.equal(
+    (
+      await request(
+        gateway.url,
+        "/top-ups",
+        token,
+        { cardId: "k1", amount: "5000" },
+        { "Idempotency-Key": randomUUID() },
+      )
+    ).status,
+    200,
+  );
+  const receiver = await request(gateway.url, "/auth/register", undefined, {
+    phone: "+79" + randomInt(100000000, 999999999),
+    name: "Получатель",
+    password: "Cardo12345",
+  });
+  assert.equal(receiver.status, 201);
+  await request(gateway.url, "/recipients/resolve", token, {
+    phone: receiver.data.user.phone,
+  });
   const before = await request(gateway.url, "/cards", token);
+  let publishedRates;
   await t.test(
     "Rates owns quotation data and receives trace context",
     async () => {
@@ -89,8 +115,11 @@ test("Real service boundaries, dependency failure and exchange replay", async (t
       assert.equal(direct.status, 403);
       const published = await request(gateway.url, "/rates", token);
       assert.equal(published.status, 200);
-      assert.equal(published.data.version, "fixture-v1");
-      assert.equal(published.data.rates.USD, 92.5);
+      assert.match(published.data.version, /^cbr-\d{4}-\d{2}-\d{2}-[0-9a-f]{16}$/);
+      assert.equal(published.data.source, "cbr");
+      assert.match(published.data.asOf, /^\d{4}-\d{2}-\d{2}$/);
+      assert.ok(published.data.rates.USD > 0 && published.data.rates.EUR > 0);
+      publishedRates = published.data;
       const invalid = await fetch(
         rateService.url + "/internal/quotes?from=RUB&to=KZT",
         { headers: { "X-Internal-Token": internal } },
@@ -105,9 +134,42 @@ test("Real service boundaries, dependency failure and exchange replay", async (t
     "X-Request-Id": "rates-boundary-" + randomUUID(),
   });
   assert.equal(first.status, 200);
-  assert.equal(first.data.received, "1.00");
-  assert.equal(first.data.rateVersion, "fixture-v1");
+  const numerator = 9250n * 10000n;
+  const denominator = BigInt(Math.round(publishedRates.rates.USD * 10000));
+  const expectedMinor = (numerator + denominator / 2n) / denominator;
+  assert.equal(first.data.received, `${expectedMinor / 100n}.${String(expectedMinor % 100n).padStart(2, "0")}`);
+  assert.equal(first.data.rateVersion, publishedRates.version);
   assert.equal(lastTrace, first.headers.get("x-request-id"));
+  await t.test(
+    "A changed source quote cannot modify a saved exchange or debit on replay",
+    async () => {
+      const balances = (await request(gateway.url, "/cards", token)).data;
+      activeSnapshot = {
+        ...activeSnapshot,
+        version: activeSnapshot.version + "-changed",
+        units: { ...activeSnapshot.units, USD: String(BigInt(activeSnapshot.units.USD) + 100000n) },
+      };
+      const changed = await fetch(rateService.url + "/internal/quotes?from=RUB&to=USD", {
+        headers: { "X-Internal-Token": internal },
+      });
+      assert.equal(changed.status, 200);
+      const quote = await changed.json();
+      assert.notEqual(quote.version, first.data.rateVersion);
+      assert.notEqual(quote.denominator, denominator.toString());
+      const replay = await request(gateway.url, "/exchange", token, body, {
+        "Idempotency-Key": key,
+      });
+      assert.equal(replay.status, 200);
+      assert.deepEqual(replay.data, first.data);
+      assert.deepEqual((await request(gateway.url, "/cards", token)).data, balances);
+      const fresh = await request(gateway.url, "/exchange", token, body, {
+        "Idempotency-Key": "ex-" + randomUUID(),
+      });
+      assert.equal(fresh.status, 200);
+      assert.equal(fresh.data.rateVersion, quote.version);
+      assert.notEqual(fresh.data.received, first.data.received);
+    },
+  );
   await close(rateService.server);
   ratesClosed = true;
   await t.test(
@@ -143,6 +205,8 @@ test("Real service boundaries, dependency failure and exchange replay", async (t
     async () => {
       assert.equal((await request(gateway.url, "/profile", token)).status, 200);
       const contacts = (await request(gateway.url, "/contacts", token)).data;
+      const senderBefore = (await request(gateway.url, "/cards", token)).data[0];
+      const receiverBefore = (await request(gateway.url, "/cards", receiver.data.token)).data[0];
       const transfer = await request(
         gateway.url,
         "/transfer",
@@ -155,6 +219,11 @@ test("Real service boundaries, dependency failure and exchange replay", async (t
         { "Idempotency-Key": randomUUID() },
       );
       assert.equal(transfer.status, 200);
+      assert.equal(transfer.data.plan, "standard");
+      assert.equal(transfer.data.fee, "500.00");
+      assert.equal(transfer.data.totalDebit, "501.00");
+      assert.equal(BigInt((await request(gateway.url, "/cards", token)).data[0].balanceMinor), BigInt(senderBefore.balanceMinor) - 50100n);
+      assert.equal(BigInt((await request(gateway.url, "/cards", receiver.data.token)).data[0].balanceMinor), BigInt(receiverBefore.balanceMinor) + 100n);
       const health = await fetch(gateway.url + "/health");
       assert.equal(health.status, 503);
       const state = await health.json();
@@ -173,10 +242,14 @@ test("Real service boundaries, dependency failure and exchange replay", async (t
         banking.query("SELECT * FROM rates.snapshots LIMIT 1"),
         (error) => error.code === "42501",
       );
+      await assert.rejects(
+        banking.query("SELECT * FROM engagement.memberships LIMIT 1"),
+        (error) => error.code === "42501",
+      );
       const qa = pool("qa");
       try {
         assert.equal(
-          (await qa.query("SELECT id FROM rates.snapshots")).rows[0].id,
+          (await qa.query("SELECT id FROM rates.snapshots WHERE id='fixture-v1'")).rows[0].id,
           "fixture-v1",
         );
         await assert.rejects(
@@ -203,7 +276,7 @@ test("Real service boundaries, dependency failure and exchange replay", async (t
       );
       const bad = await listen(fault);
       const isolated = await listen(
-        createBankingApp(banking, createRatesClient(bad.url)),
+        createBankingApp(banking, createRatesClient(bad.url), createCustomerClient(defaults.customer), createMembershipClient(defaults.engagement)),
       );
       try {
         const response = await fetch(isolated.url + "/api/exchange", {

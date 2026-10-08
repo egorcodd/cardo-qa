@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { api } from "../api.js";
 import { useLang } from "../i18n.jsx";
 import { enablePush, disablePush } from "../pwa.js";
 import Icon from "../icons.jsx";
 import Dialog from "../components/Dialog.jsx";
 import Field from "../components/Field.jsx";
+import ValidationMessage from "../components/ValidationMessage.jsx";
 function SettingRow({ icon, title, subtitle, children, onClick }) {
   const Tag = onClick ? "button" : "div";
   return (
@@ -28,11 +29,38 @@ export function Settings({
   profile,
   onSave,
   notify,
-  install,
   onPasswordChanged,
+  sessionCurrent,
 }) {
   const { lang } = useLang(),
     w = (ru, en) => (lang === "en" ? en : ru);
+  const alive = useRef(true);
+  const savedInterface = useRef({
+    language: profile.language,
+    hideBalance: profile.hideBalance,
+  });
+  const [preferences, setPreferences] = useState(null),
+    [savedPreferences, setSavedPreferences] = useState(null),
+    [preferenceError, setPreferenceError] = useState("");
+  async function loadPreferences() {
+    try {
+      const value = await api.notificationPreferences();
+      if (alive.current) {
+        setPreferences(value);
+        setSavedPreferences(value);
+        setPreferenceError("");
+      }
+    } catch (e) {
+      if (alive.current) setPreferenceError(e.message);
+    }
+  }
+  useEffect(() => {
+    alive.current = true;
+    loadPreferences();
+    return () => {
+      alive.current = false;
+    };
+  }, []);
   const [push, setPush] = useState(false),
     [pending, setPending] = useState(false),
     [pushReady, setPushReady] = useState(false);
@@ -48,9 +76,16 @@ export function Settings({
       confirmPassword: "",
     }),
     [pwError, setPwError] = useState("");
-  const dirty =
+  const interfaceDirty =
     draft.language !== profile.language ||
     draft.hideBalance !== profile.hideBalance;
+  const preferencesDirty =
+    preferences &&
+    savedPreferences &&
+    ["transactions", "service", "offers"].some(
+      (key) => preferences[key] !== savedPreferences[key],
+    );
+  const dirty = interfaceDirty || preferencesDirty;
   useEffect(() => {
     let alive = true;
     navigator.serviceWorker
@@ -69,20 +104,31 @@ export function Settings({
       alive = false;
     };
   }, []);
-  useEffect(
-    () =>
-      setDraft({
-        language: profile.language,
-        hideBalance: profile.hideBalance,
-      }),
-    [profile.language, profile.hideBalance],
-  );
+  useEffect(() => {
+    const previous = savedInterface.current;
+    const next = {
+      language: profile.language,
+      hideBalance: profile.hideBalance,
+    };
+    savedInterface.current = next;
+    setDraft((current) => ({
+      language:
+        current.language === previous.language
+          ? next.language
+          : current.language,
+      hideBalance:
+        current.hideBalance === previous.hideBalance
+          ? next.hideBalance
+          : current.hideBalance,
+    }));
+  }, [profile.language, profile.hideBalance]);
   async function toggle() {
     if (pending) return;
     setPending(true);
     try {
       if (push) await disablePush();
-      else await enablePush();
+      else await enablePush(() => alive.current && sessionCurrent());
+      if (!alive.current) return;
       setPush(!push);
       notify(
         push
@@ -90,36 +136,29 @@ export function Settings({
           : w("Уведомления включены", "Notifications enabled"),
       );
     } catch (e) {
-      notify(e.message, "close");
+      if (alive.current) notify(e.message, "close");
     } finally {
-      setPending(false);
-    }
-  }
-  async function test() {
-    if (pending) return;
-    setPending(true);
-    try {
-      const result = await api.testNotification();
-      notify(
-        result.pushQueued
-          ? w("Уведомление отправлено в очередь", "Notification queued")
-          : w("Уведомление добавлено в Cardo", "Notification added to Cardo"),
-      );
-    } catch (e) {
-      notify(e.message, "close");
-    } finally {
-      setPending(false);
+      if (alive.current) setPending(false);
     }
   }
   async function save() {
+    if (pending || !dirty) return;
     setPending(true);
     setError("");
     try {
-      await onSave(draft);
+      if (preferencesDirty) {
+        const value = await api.saveNotificationPreferences(preferences);
+        if (!alive.current) return;
+        setPreferences(value);
+        setSavedPreferences(value);
+      }
+      if (interfaceDirty) await onSave(draft);
+      else if (alive.current)
+        notify(w("Настройки сохранены", "Settings saved"));
     } catch (e) {
-      setError(e.message);
+      if (alive.current) setError(e.message);
     } finally {
-      setPending(false);
+      if (alive.current) setPending(false);
     }
   }
   async function change(e) {
@@ -133,31 +172,20 @@ export function Settings({
     setPwError("");
     try {
       await api.changePassword(passwords);
+      if (!alive.current) return;
       setPasswordOpen(false);
       setPasswords({ currentPassword: "", password: "", confirmPassword: "" });
       await onPasswordChanged();
     } catch (e) {
-      setPwError(e.message);
+      if (alive.current) setPwError(e.message);
     } finally {
-      setPending(false);
+      if (alive.current) setPending(false);
     }
-  }
-  function reset() {
-    setDraft({ language: "ru", hideBalance: false });
-    setError("");
   }
   return (
     <div className="design-page anim">
       <div className="page-h">
         <h1 className="send-h">{w("Настройки", "Settings")}</h1>
-        <button
-          className="soft-link settings-reset"
-          onClick={reset}
-          disabled={pending}
-        >
-          <Icon name="reset" size={17} />
-          {w("По умолчанию", "Reset defaults")}
-        </button>
       </div>
       <section className="set-group">
         <h2 className="set-gt">{w("Безопасность", "Security")}</h2>
@@ -188,8 +216,8 @@ export function Settings({
         <div className="set-card">
           <SettingRow
             icon="bell"
-            title="Push"
-            subtitle={w("Операции и награды", "Transactions and rewards")}
+            title={w("На этом устройстве", "On this device")}
+            subtitle={w("Сообщения на экране", "Messages on your screen")}
           >
             <input
               className="sw"
@@ -201,17 +229,65 @@ export function Settings({
               disabled={pending || !pushReady}
             />
           </SettingRow>
-          <SettingRow
-            icon="shield"
-            title={w("Проверить уведомление", "Test notification")}
-            subtitle={w(
-              "Отправить сообщение в Cardo",
-              "Send a message to Cardo",
-            )}
-            onClick={pending ? undefined : test}
-          />
+          {preferences &&
+            [
+              {
+                key: "transactions",
+                icon: "card",
+                title: w("Операции", "Transactions"),
+                subtitle: w("Переводы и пополнения", "Transfers and top-ups"),
+              },
+              {
+                key: "service",
+                icon: "clock",
+                title: w("Сервис", "Service"),
+                subtitle: w(
+                  "Безопасность и награды",
+                  "Security and rewards",
+                ),
+              },
+              {
+                key: "offers",
+                icon: "gift",
+                title: w("Предложения", "Offers"),
+                subtitle: w(
+                  "Новости и возможности Cardo",
+                  "Cardo news and features",
+                ),
+              },
+            ].map((item) => (
+              <SettingRow
+                key={item.key}
+                icon={item.icon}
+                title={item.title}
+                subtitle={item.subtitle}
+              >
+                <input
+                  className="sw"
+                  type="checkbox"
+                  role="switch"
+                  aria-label={item.title}
+                  checked={preferences[item.key]}
+                  disabled={pending}
+                  onChange={(e) =>
+                    setPreferences({
+                      ...preferences,
+                      [item.key]: e.target.checked,
+                    })
+                  }
+                />
+              </SettingRow>
+            ))}
         </div>
       </section>
+      {preferenceError && (
+        <section className="card-soft">
+          <ValidationMessage message={preferenceError} />
+          <button className="soft-link" onClick={loadPreferences}>
+            {w("Повторить", "Retry")}
+          </button>
+        </section>
+      )}
       <section className="set-group">
         <h2 className="set-gt">{w("Интерфейс", "Interface")}</h2>
         <div className="set-card">
@@ -256,31 +332,7 @@ export function Settings({
           </SettingRow>
         </div>
       </section>
-      <section className="set-group">
-        <h2 className="set-gt">
-          {w("Cardo на устройстве", "Cardo on your device")}
-        </h2>
-        <div className="set-card">
-          <SettingRow
-            icon="smartphone"
-            title={w("Приложение Cardo", "Cardo app")}
-            subtitle={
-              install
-                ? w("Добавить на главный экран", "Add to your home screen")
-                : w(
-                    "В меню браузера: «Установить». На iPhone: «Поделиться» → «На экран Домой».",
-                    "Use Install in the browser menu. On iPhone: Share → Add to Home Screen.",
-                  )
-            }
-            onClick={install}
-          />
-        </div>
-      </section>
-      {error && (
-        <p className="form-error" role="alert">
-          {error}
-        </p>
-      )}
+      <ValidationMessage message={error} />
       <button
         className={"btn-dark" + (pending ? " loading" : "")}
         disabled={!dirty || pending}
@@ -326,11 +378,7 @@ export function Settings({
               required
             />
           ))}
-          {pwError && (
-            <p className="form-error" role="alert">
-              {pwError}
-            </p>
-          )}
+          <ValidationMessage message={pwError} />
           <button
             className={"btn-dark" + (pending ? " loading" : "")}
             disabled={pending}

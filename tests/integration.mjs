@@ -77,7 +77,12 @@ test("Cardo services and persistent banking workflows", async (t) => {
     cards = (await req("/cards", { token: user.token })).body;
     contacts = (await req("/contacts", { token: user.token })).body;
     assert.equal(cards.length, 3);
-    assert.equal(contacts.length, 16);
+    assert.equal(contacts.length, 0);
+    assert.equal(cards[0].balanceMinor, "0");
+    assert.equal(
+      (await req("/transactions", { token: user.token })).body.length,
+      0,
+    );
     const otherCards = (await req("/cards", { token: other.token })).body;
     assert.equal(otherCards[0].balanceMinor, cards[0].balanceMinor);
     const spoof = await req("/profile", {
@@ -85,22 +90,30 @@ test("Cardo services and persistent banking workflows", async (t) => {
       headers: { "X-User-Id": other.user.id, "X-Internal-Token": "forged" },
     });
     assert.equal(spoof.body.id, user.user.id);
-    const unique = (
-      await req("/cards", {
+    assert.equal(
+      (await req("/cards", {
         token: user.token,
         method: "POST",
         body: { currency: "USD", tone: "dark" },
-      })
-    ).body;
+      })).status,
+      404,
+    );
+    const unique = cards[1];
     assert.match(unique.id, /^k/);
+    const ownRequisites = await req("/cards/" + unique.id + "/requisites", { token: user.token });
+    const otherRequisites = await req("/cards/" + unique.id + "/requisites", { token: other.token });
+    assert.equal(ownRequisites.status, 200);
+    assert.equal(otherRequisites.status, 200);
+    assert.notEqual(ownRequisites.body.number, otherRequisites.body.number);
+    const absentCardId = "k" + randomUUID();
     assert.equal(
-      (await req("/cards/" + unique.id + "/requisites", { token: other.token }))
+      (await req("/cards/" + absentCardId + "/requisites", { token: other.token }))
         .status,
       404,
     );
     assert.equal(
       (
-        await req("/cards/" + unique.id + "/freeze", {
+        await req("/cards/" + absentCardId + "/freeze", {
           token: other.token,
           method: "POST",
           body: { frozen: true },
@@ -113,7 +126,7 @@ test("Cardo services and persistent banking workflows", async (t) => {
         await req("/settings", {
           token: other.token,
           method: "PUT",
-          body: { mainCardId: unique.id },
+          body: { mainCardId: absentCardId },
         })
       ).status,
       404,
@@ -133,6 +146,27 @@ test("Cardo services and persistent banking workflows", async (t) => {
       unique.id,
     );
   });
+  contacts = [
+    (
+      await req("/recipients/resolve", {
+        token: user.token,
+        method: "POST",
+        body: { phone: other.phone },
+      })
+    ).body,
+  ];
+  assert.equal(
+    (
+      await req("/top-ups", {
+        token: user.token,
+        method: "POST",
+        body: { cardId: cards[0].id, amount: "500000" },
+        headers: { "Idempotency-Key": randomUUID() },
+      })
+    ).status,
+    200,
+  );
+  cards = (await req("/cards", { token: user.token })).body;
   let transfer;
   await t.test(
     "exact cents, concurrent replay and conflicting key",
@@ -156,10 +190,16 @@ test("Cardo services and persistent banking workflows", async (t) => {
       replies.forEach((r) => assert.equal(r.status, 200));
       assert.equal(new Set(replies.map((r) => r.body.transferId)).size, 1);
       transfer = replies[0].body;
+      assert.equal(transfer.plan, "standard");
+      assert.equal(transfer.feeMinor, "50000");
+      assert.equal(transfer.fee, "500.00");
+      assert.equal(transfer.totalDebitMinor, "51015");
+      assert.equal(transfer.totalDebit, "510.15");
+      assert.equal((await req("/transfer/fee", { token: user.token })).body.feeMinor, "50000");
       const next = (await req("/cards", { token: user.token })).body[0];
       assert.equal(
         BigInt(next.balanceMinor),
-        BigInt(cards[0].balanceMinor) - 1015n,
+        BigInt(cards[0].balanceMinor) - 51015n,
       );
       const conflict = await req("/transfer", {
         token: user.token,
@@ -169,7 +209,11 @@ test("Cardo services and persistent banking workflows", async (t) => {
       });
       assert.equal(conflict.status, 409);
       const untouched = (await req("/cards", { token: other.token })).body[0];
-      assert.equal(untouched.balanceMinor, cards[0].balanceMinor);
+      assert.equal(untouched.balanceMinor, "1015");
+      const feeOperation = (await req("/transactions/" + transfer.feeOperationId, { token: user.token })).body;
+      assert.equal(feeOperation.cat, "c.fee");
+      assert.equal(feeOperation.amountMinor, "-50000");
+      assert.equal(feeOperation.transferId, transfer.transferId);
     },
   );
   await t.test(
@@ -293,6 +337,9 @@ test("Cardo services and persistent banking workflows", async (t) => {
         (await req("/rewards", { token: user.token })).body.balance,
         5,
       );
+      assert.equal((await req("/membership", { token: user.token })).body.premium, true);
+      assert.equal((await req("/transfer/fee", { token: user.token })).body.feeMinor, "10000");
+      assert.equal((await req("/transactions/" + transfer.senderOperationId, { token: user.token })).body.feeMinor, "50000");
       assert.equal(
         (
           await req("/notifications/" + n.id + "/read", {
@@ -345,11 +392,16 @@ test("Cardo services and persistent banking workflows", async (t) => {
       assert.equal(a.status, 200);
       assert.equal(b.status, 200);
       assert.notEqual(a.body.transferId, b.body.transferId);
+      for (const sent of [a, b]) {
+        assert.equal(sent.body.plan, "plus");
+        assert.equal(sent.body.feeMinor, "10000");
+        assert.equal(sent.body.totalDebitMinor, "10001");
+      }
       assert.equal(
         BigInt(
           (await req("/cards", { token: user.token })).body[0].balanceMinor,
         ),
-        BigInt(before.balanceMinor) - 2n,
+        BigInt(before.balanceMinor) - 20002n,
       );
     },
   );
@@ -395,8 +447,8 @@ test("Cardo services and persistent banking workflows", async (t) => {
     async () => {
       const rows = (
         await db.query(
-          "SELECT a.balance_minor,a.opening_balance_minor,coalesce(sum(t.amount_minor),0)::text total FROM banking.accounts a LEFT JOIN banking.transactions t ON t.user_id=a.user_id AND t.account_id=a.id WHERE a.user_id=$1 GROUP BY a.user_id,a.id",
-          [user.user.id],
+          "SELECT a.balance_minor,a.opening_balance_minor,coalesce(sum(t.amount_minor),0)::text total FROM banking.accounts a LEFT JOIN banking.transactions t ON t.user_id=a.user_id AND t.account_id=a.id WHERE a.user_id=ANY($1::uuid[]) GROUP BY a.user_id,a.id",
+          [[user.user.id, other.user.id]],
         )
       ).rows;
       rows.forEach((row) =>

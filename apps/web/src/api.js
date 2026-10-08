@@ -46,10 +46,21 @@ export const api = {
       headers: { "Idempotency-Key": key },
     }),
   contacts: () => req("/contacts"),
+  resolveRecipient: (value) => req("/recipients/resolve", body("POST", value)),
+  topUp: (value, key) =>
+    req("/top-ups", {
+      ...body("POST", value),
+      headers: { "Idempotency-Key": key },
+    }),
+  membership: () => req("/membership"),
+  transferFee: () => req("/transfer/fee"),
+  notificationPreferences: () => req("/notifications/preferences"),
+  saveNotificationPreferences: (value) =>
+    req("/notifications/preferences", body("PATCH", value)),
   cards: () => req("/cards"),
   requisites: (id) => req("/cards/" + encodeURIComponent(id) + "/requisites"),
   transactions: () => req("/transactions"),
-  newCard: (value) => req("/cards", body("POST", value)),
+  transaction: (id) => req("/transactions/" + encodeURIComponent(id)),
   freeze: (id, frozen) =>
     req(
       "/cards/" + encodeURIComponent(id) + "/freeze",
@@ -79,5 +90,4 @@ export const api = {
     req("/push/subscriptions", body("POST", { subscription })),
   unsubscribe: (endpoint) =>
     req("/push/subscriptions", body("DELETE", { endpoint })),
-  testNotification: () => req("/notifications/test", body("POST", {})),
 };

@@ -4,6 +4,9 @@ import Icon from "../../icons.jsx";
 import { fmt, money } from "../../data.js";
 import { useLang } from "../../i18n.jsx";
 import { api } from "../../api.js";
+import BankIcon from "../BankIcon.jsx";
+import { bankName, recipientBank } from "../../banks.js";
+import { operationVisual } from "../operationVisual.js";
 function Qr({ value, size = 176 }) {
   return <QRCodeSVG value={value} size={size} marginSize={2} />;
 }
@@ -34,7 +37,7 @@ export function Receive({ card, onClose, notify }) {
     ? [
         { k: "det.number", v: req.number, copy: req.number.replace(/\s/g, "") },
         { k: "det.acct", v: req.account, copy: req.account.replace(/\s/g, "") },
-        { k: "rcv.bank", v: "Cardoo" },
+        { k: "rcv.bank", v: "Cardo" },
         { k: "rcv.recipient", v: req?.holder || card.holder },
       ]
     : [];
@@ -116,14 +119,18 @@ export function Receive({ card, onClose, notify }) {
   );
 }
 export function Success({ data, onClose }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
+  const bank = data.bankId || recipientBank(data.recipient);
   return (
     <div className="ov suc-ov">
       <div className="suc">
         <div className="suc-circle">
-          <svg viewBox="0 0 52 52" className="suc-check">
-            <path d="M14 27l8 8 16-18" />
-          </svg>
+          <Icon
+            name="check"
+            size={46}
+            className="suc-check"
+            style={{ strokeWidth: 1.8 }}
+          />
         </div>
         <h2>{t("success.title")}</h2>
         <div className="suc-amount">
@@ -132,6 +139,28 @@ export function Success({ data, onClose }) {
         <p className="suc-to">
           {t("success.to", { name: data.recipient.name })}
         </p>
+        {bank && (
+          <div className="success-recipient-bank">
+            <BankIcon id={bank} size={28} />
+            <span>
+              {bankName(bank, data.bankName || data.recipient.bankName)}
+            </span>
+            <small>{data.recipientReference || data.recipient.acct}</small>
+          </div>
+        )}
+        {data.transferKind === "external" && (
+          <p className="success-transfer-note">
+            {lang === "ru"
+              ? "Перевод сохранён в Cardo"
+              : "Transfer saved in Cardo"}
+          </p>
+        )}
+        {Number(data.fee) > 0 && (
+          <div className="success-cost">
+            <span>{t("tx.fee")} {money(Number(data.fee), data.cur, 0)}</span>
+            <strong>{lang === "ru" ? "Всего списано" : "Total debited"} {money(Number(data.totalDebit), data.cur, 2)}</strong>
+          </div>
+        )}
         <button className="btn-dark" onClick={onClose}>
           {t("success.done")}
         </button>
@@ -140,16 +169,35 @@ export function Success({ data, onClose }) {
   );
 }
 export function TxDetails({ tx, onClose }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const rows = [
+    ...(tx.bankId
+      ? [{ k: t("rcv.bank"), v: bankName(tx.bankId, tx.bankName) }]
+      : []),
+    ...(tx.recipientReference
+      ? [
+          {
+            k: lang === "ru" ? "Реквизиты" : "Recipient details",
+            v: tx.recipientReference,
+          },
+        ]
+      : []),
     { k: t("tx.status"), v: t("tx.done") },
-    { k: t("tx.date"), v: t(tx.group) },
+    {
+      k: t("tx.date"),
+      v: tx.createdAt
+        ? new Date(tx.createdAt).toLocaleString(
+            lang === "en" ? "en-GB" : "ru-RU",
+          )
+        : t(tx.group),
+    },
     { k: t("tx.category"), v: t(tx.cat) },
 
-    { k: t("tx.acctOut"), v: t(tx.card) },
+    { k: t(tx.amount > 0 ? "tx.acctIn" : "tx.acctOut"), v: t(tx.card) },
     { k: t("tx.type"), v: tx.amount > 0 ? t("tx.income") : t("tx.expense") },
 
-    { k: t("tx.fee"), v: money(0, "₽", 0) },
+    { k: t("tx.fee"), v: money(Number(tx.fee || 0), tx.cur, 0) },
+    ...(Number(tx.fee) > 0 ? [{ k: lang === "ru" ? "Всего списано" : "Total debited", v: money(Number(tx.totalDebit), tx.cur, 2) }] : []),
   ];
   return (
     <div
@@ -167,14 +215,18 @@ export function TxDetails({ tx, onClose }) {
         </div>
         <div className="txd-top">
           <span className="txd-ic">
-            <Icon name={tx.icon} size={26} />
+            {tx.bankId ? (
+              <BankIcon id={tx.bankId} size={54} />
+            ) : (
+              <Icon name={operationVisual(tx)} size={26} />
+            )}
           </span>
           <div className="txd-nm">{t(tx.name)}</div>
           <div className="txd-cat">{t(tx.cat)}</div>
 
           <div className={"txd-amt " + (tx.amount > 0 ? "pos" : "neg")}>
             {(tx.amount > 0 ? "+" : "−") +
-              fmt(Math.floor(Math.abs(tx.amount)), 0) +
+              fmt(Math.abs(tx.amount), Number.isInteger(tx.amount) ? 0 : 2) +
               " " +
               tx.cur}
           </div>
@@ -271,6 +323,9 @@ export function Limits({ onClose, notify }) {
                     <div className="lim-inp">
                       <input
                         type="number"
+                        min={l.min}
+                        max={l.max}
+                        step={l.step}
                         value={vals[l.id]}
                         onChange={(e) => set(l.id, Number(e.target.value) || 0)}
                       />
@@ -284,7 +339,7 @@ export function Limits({ onClose, notify }) {
                     min={l.min}
                     max={l.max}
                     step={l.step}
-                    value={vals[l.id] / 2}
+                    value={vals[l.id]}
                     onChange={(e) => set(l.id, Number(e.target.value))}
                   />
                 </div>

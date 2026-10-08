@@ -3,33 +3,17 @@ import Icon from "../icons.jsx";
 import Bcard from "../components/BankCard.jsx";
 import { useLang } from "../i18n.jsx";
 
-export function Cards({
-  cards,
-  mainId,
-  onPick,
-  onDetails,
-  onNew,
-  onFreeze,
-  notify,
-}) {
+export function Cards({ cards, mainId, onPick, onDetails, onFreeze }) {
   const { t } = useLang();
   return (
     <div className="page anim">
       <div className="cards-top">
         <h1 className="send-h">{t("cards.title")}</h1>
-        <button className="newcard" onClick={onNew}>
-          <Icon name="plus" size={16} />
-          {t("cards.new")}
-        </button>
       </div>
       <div className="cardlist">
         {cards.map((c) => (
           <div className="cardwrap" key={c.id}>
-            <Bcard
-              c={c}
-              main={c.id === mainId || c.id === "k2"}
-              onClick={() => onDetails(c)}
-            />
+            <Bcard c={c} main={c.id === mainId} onClick={() => onDetails(c)} />
             <div className="card-actions">
               <button className="ca-btn" onClick={() => onDetails(c)}>
                 <Icon name="card" size={16} />

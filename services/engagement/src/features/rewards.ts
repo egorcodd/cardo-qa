@@ -4,6 +4,7 @@ import { Router } from "express";
 import type { Pool } from "pg";
 import { rewards, ensure } from "../wallet.ts";
 import { notification } from "../notifications.ts";
+import { ensureMembership, membership } from "./membership.ts";
 export function createRewardsRoutes(pool: Pool) {
   const app = Router();
   app.get(
@@ -65,6 +66,13 @@ export function createRewardsRoutes(pool: Pool) {
           "INSERT INTO engagement.redemptions(user_id,reward_id) VALUES($1,$2)",
           [user, reward.id],
         );
+        if (reward.id === "plus") {
+          await ensureMembership(c, user);
+          await c.query(
+            "UPDATE engagement.memberships SET expires_at=greatest(coalesce(expires_at,now()),now())+interval '30 days' WHERE user_id=$1",
+            [user],
+          );
+        }
         await notification(
           c,
           user,
@@ -73,7 +81,7 @@ export function createRewardsRoutes(pool: Pool) {
           reward.title,
           "/rewards",
         );
-        return { ok: true, balance: wallet.points - reward.cost };
+        return { ok: true, balance: wallet.points - reward.cost, membership: await membership(c, user) };
       });
       res.json(result);
     }),

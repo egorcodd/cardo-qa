@@ -3,6 +3,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { api } from "../api.js";
 import { useLang } from "../i18n.jsx";
 import Icon, { BrandMark } from "../icons.jsx";
+import ValidationMessage from "./ValidationMessage.jsx";
 import "../auth.css";
 const digits = (value) => {
   let d = value.replace(/\D/g, "");
@@ -63,11 +64,7 @@ function AuthField({
           </button>
         )}
       </div>
-      {error && (
-        <p id={id + "-error"} className="fld-err" role="alert">
-          {error}
-        </p>
-      )}
+      <ValidationMessage id={id + "-error"} className="fld-err" message={error} />
       {children}
     </div>
   );

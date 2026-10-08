@@ -3,7 +3,11 @@ export async function registerWorker() {
   if (!("serviceWorker" in navigator) || !window.isSecureContext) return null;
   return navigator.serviceWorker.register("/sw.js", { scope: "/" });
 }
-export async function enablePush() {
+export async function enablePush(isCurrent = () => true) {
+  const ensureCurrent = () => {
+    if (!isCurrent()) throw new Error("Сессия изменилась. Открой настройки ещё раз");
+  };
+  ensureCurrent();
   if (
     !("PushManager" in window) ||
     !("Notification" in window) ||
@@ -14,13 +18,17 @@ export async function enablePush() {
     );
   const registration = await registerWorker();
   if (!registration) throw new Error("Не удалось подключить уведомления");
+  ensureCurrent();
   const permission = await Notification.requestPermission();
+  ensureCurrent();
   if (permission !== "granted")
     throw new Error(
       "Уведомления не разрешены. Измени разрешение в настройках браузера",
     );
   const ready = await navigator.serviceWorker.ready;
+  ensureCurrent();
   const { publicKey } = await api.pushConfig();
+  ensureCurrent();
   const key = Uint8Array.from(
     atob(
       publicKey
@@ -36,6 +44,7 @@ export async function enablePush() {
       userVisibleOnly: true,
       applicationServerKey: key,
     }));
+  ensureCurrent();
   await api.subscribe(subscription.toJSON());
 }
 export async function disablePush() {

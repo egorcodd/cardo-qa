@@ -2,49 +2,55 @@ import { useLang } from "../i18n.jsx";
 export function Notifications({ items, onRead, go }) {
   const { lang } = useLang();
   const w = (ru, en) => (lang === "en" ? en : ru);
-  async function open(item) {
-    await onRead(item.id);
-    go(item.url);
+  const visibleItems = items.filter((item) => item.kind !== "test");
+  const formatTime = (value) =>
+    new Date(value).toLocaleString(lang === "en" ? "en-GB" : "ru-RU", {
+      day: "numeric",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  async function openNotice(item) {
+    if (await onRead(item.id)) go(item.url || "notifications");
   }
   return (
-    <div className="account-page anim">
+    <div className="design-page anim">
       <h1 className="send-h">{w("Уведомления", "Notifications")}</h1>
-      {!items.length ? (
+      {!visibleItems.length ? (
         <section className="card-soft">
           <p className="field-help">
             {w(
-              "Пока ничего нет. Здесь появятся переводы и награды.",
-              "No notifications yet. Transfers and rewards will appear here.",
+              "Пока ничего нет. Здесь появятся операции, награды и предложения Cardo.",
+              "No notifications yet. Transactions, rewards and Cardo offers will appear here.",
             )}
           </p>
         </section>
       ) : (
-        items.map((item) => (
+        visibleItems.map((item) => (
           <button
             className={
               "card-soft notification-item" + (item.read ? "" : " unread")
             }
             key={item.id}
-            onClick={() => open(item)}
+            onClick={() => openNotice(item)}
           >
             <div className="notice-top">
               <strong>
                 {lang === "en"
                   ? {
                       transfer: "Transfer complete",
+                      transfer_incoming: "Money received",
+                      top_up: "Account topped up",
                       reward: "Reward received",
-                      test: "Cardo notification",
+                      reminder: "Reminder",
+                      offer: "Cardo offer",
                     }[item.kind] || item.title
                   : item.title}
               </strong>
               {!item.read && <span className="notice-dot" />}
             </div>
             <p>{item.body}</p>
-            <time>
-              {new Date(item.created_at).toLocaleString(
-                lang === "en" ? "en-GB" : "ru-RU",
-              )}
-            </time>
+            <time>{formatTime(item.created_at || item.createdAt)}</time>
           </button>
         ))
       )}

@@ -1,3 +1,17 @@
+export const externalBanks = [
+  { id: "tbank", name: "Т-Банк", favorite: false },
+  { id: "vtb", name: "ВТБ", favorite: false },
+  { id: "tochka", name: "Точка", favorite: false },
+  { id: "revolut", name: "Revolut", favorite: false },
+  { id: "wise", name: "Wise", favorite: false },
+  { id: "sber", name: "Сбер", favorite: false },
+  { id: "alfa", name: "Альфа-Банк", favorite: false },
+  { id: "gazprombank", name: "Газпромбанк", favorite: false },
+  { id: "raiffeisen", name: "Райффайзенбанк", favorite: false },
+  { id: "sovcombank", name: "Совкомбанк", favorite: false },
+  { id: "ozon", name: "Ozon Банк", favorite: false },
+] as const;
+export type ExternalBankId = (typeof externalBanks)[number]["id"];
 export const currencies = ["RUB", "USD", "EUR"] as const;
 export type Currency = (typeof currencies)[number];
 export type RateQuote = {
@@ -30,17 +44,59 @@ export type User = {
   createdAt: string;
   passwordChangedAt: string;
 };
-export type DomainEvent = {
+type EventBase = {
   id: string;
-  type: "banking.transfer.completed";
-  version: 1;
   userId: string;
   requestId: string;
   occurredAt: string;
-  payload: {
-    transferId: string;
-    amount: string;
-    currency: Currency;
-    recipient: string;
-  };
 };
+export type DomainEvent = EventBase &
+  (
+    | {
+        type: "banking.transfer.completed";
+        version: 1;
+        payload: {
+          transferId: string;
+          amount: string;
+          currency: Currency;
+          recipient: string;
+        };
+      }
+    | {
+        type: "banking.transfer.completed";
+        version: 2;
+        payload: {
+          transferId: string;
+          senderUserId: string;
+          receiverUserId: string;
+          senderOperationId: string;
+          receiverOperationId: string;
+          amount: string;
+          currency: Currency;
+          senderName: string;
+          receiverName: string;
+        };
+      }
+    | {
+        type: "banking.external-transfer.completed";
+        version: 1;
+        payload: {
+          operationId: string;
+          amount: string;
+          currency: Currency;
+          bankId: ExternalBankId;
+          bankName: string;
+          recipientReference: string;
+        };
+      }
+    | {
+        type: "banking.top-up.completed";
+        version: 1;
+        payload: {
+          operationId: string;
+          amount: string;
+          currency: Currency;
+          balance: string;
+        };
+      }
+  );

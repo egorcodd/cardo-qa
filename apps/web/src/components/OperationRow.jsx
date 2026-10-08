@@ -1,4 +1,7 @@
 import Icon from "../icons.jsx";
+import BankIcon from "./BankIcon.jsx";
+import { operationVisual } from "./operationVisual.js";
+import { bankName } from "../banks.js";
 import { fmt } from "../data.js";
 
 import { useLang } from "../i18n.jsx";
@@ -12,11 +15,20 @@ export default function OperationRow({ t: tx, style, onClick }) {
   return (
     <button className="op" style={style} onClick={onClick}>
       <span className="op-ico">
-        <Icon name={tx.icon} size={18} />
+        {tx.bankId ? (
+          <BankIcon id={tx.bankId} size={38} />
+        ) : (
+          <Icon name={operationVisual(tx)} size={18} />
+        )}
       </span>
       <div className="op-m">
         <div className="op-nm">{t(tx.name)}</div>
-        <div className="op-cat">{t(tx.cat)}</div>
+        <div className="op-cat">
+          {tx.bankId ? bankName(tx.bankId, tx.bankName) : t(tx.cat)}
+          {tx.bankId && tx.recipientReference
+            ? " · " + tx.recipientReference
+            : ""}
+        </div>
       </div>
       <div className="op-right">
         <div className={"op-sum " + (tx.amount > 0 ? "pos" : "neg")}>

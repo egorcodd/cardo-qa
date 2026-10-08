@@ -1,9 +1,7 @@
-import { randomUUID, randomInt } from "node:crypto";
 import { route, context, fail } from "../../../../packages/shared/http.ts";
-import { transaction } from "../../../../packages/shared/db.ts";
 import { Router } from "express";
 import type { Pool } from "pg";
-import { symbols, cardDTO } from "../accounts.ts";
+import { cardDTO } from "../accounts.ts";
 export function createCardsRoutes(pool: Pool) {
   const app = Router();
   app.get(
@@ -16,72 +14,6 @@ export function createCardsRoutes(pool: Pool) {
         )
       ).rows;
       res.json(rows.map(cardDTO));
-    }),
-  );
-  app.post(
-    "/api/cards",
-    route(async (req, res) => {
-      const u = context(req);
-      const currency = req.body.currency || "RUB";
-      const tone = req.body.tone || "lime";
-      if (
-        !Object.keys(symbols).includes(currency) ||
-        !["lime", "dark", "light"].includes(tone)
-      )
-        fail(422, "INVALID_CARD", "Выбери валюту и оформление");
-      const result = await transaction(pool, async (c) => {
-        await c.query(
-          "SELECT user_id FROM banking.workspaces WHERE user_id=$1 FOR UPDATE",
-          [u],
-        );
-        const count = Number(
-          (
-            await c.query(
-              "SELECT count(*) FROM banking.cards WHERE user_id=$1",
-              [u],
-            )
-          ).rows[0].count,
-        );
-        if (count >= 10) fail(409, "CARD_LIMIT", "Можно выпустить до 10 карт");
-        const account = (
-          await c.query(
-            "SELECT * FROM banking.accounts WHERE user_id=$1 AND currency=$2",
-            [u, currency],
-          )
-        ).rows[0];
-        const id = "k" + randomUUID();
-        const digits =
-          "9999 " +
-          String(randomInt(1000, 10000)) +
-          " " +
-          String(randomInt(1000, 10000)) +
-          " " +
-          String(randomInt(1000, 10000));
-        const exp = new Date();
-        exp.setFullYear(exp.getFullYear() + 3);
-        const row = (
-          await c.query(
-            "INSERT INTO banking.cards(user_id,id,account_id,number,expiry,cvc,holder,tone) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *",
-            [
-              u,
-              id,
-              account.id,
-              digits,
-              String(exp.getMonth() + 1).padStart(2, "0") +
-                "/" +
-                String(exp.getFullYear()).slice(-2),
-              String(randomInt(100, 1000)),
-              decodeURIComponent(req.header("X-User-Name") || "Клиент Cardo"),
-              tone,
-            ],
-          )
-        ).rows[0];
-        return cardDTO({
-          ...row,
-          ...{ currency, balance_minor: account.balance_minor },
-        });
-      });
-      res.status(201).json(result);
     }),
   );
   app.get(

@@ -8,7 +8,8 @@ import {
 } from "../../../packages/shared/http.ts";
 import { currencies } from "../../../packages/contracts/index.ts";
 import { currentSnapshot } from "./snapshots.ts";
-export function createRatesApp(pool: Pool) {
+import { CBR_SOURCE_URL } from "./provider.ts";
+export function createRatesApp(pool: Pool, snapshotReader = () => currentSnapshot(pool)) {
   const app = service("rates");
   app.get(
     "/health",
@@ -21,7 +22,7 @@ export function createRatesApp(pool: Pool) {
   app.get(
     "/api/rates",
     route(async (_req, res) => {
-      const snapshot = await currentSnapshot(pool);
+      const snapshot = await snapshotReader();
       res.json({
         base: snapshot.base,
         rates: Object.fromEntries(
@@ -29,8 +30,12 @@ export function createRatesApp(pool: Pool) {
             .filter(([name]) => name !== "RUB")
             .map(([name, value]) => [name, Number(value) / 10000]),
         ),
-        asOf: snapshot.source === "fixture" ? "fixture" : snapshot.publishedAt,
+        asOf: snapshot.effectiveDate,
         version: snapshot.version,
+        source: snapshot.source,
+        sourceUrl: CBR_SOURCE_URL,
+        fetchedAt: snapshot.fetchedAt,
+        stale: snapshot.stale,
       });
     }),
   );
@@ -45,7 +50,7 @@ export function createRatesApp(pool: Pool) {
         from === to
       )
         fail(422, "INVALID_CURRENCY", "Выбери две разные валюты счёта");
-      const snapshot = await currentSnapshot(pool);
+      const snapshot = await snapshotReader();
       res.json({
         version: snapshot.version,
         from,

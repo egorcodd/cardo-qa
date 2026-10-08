@@ -1,0 +1,188 @@
+.cardo-date-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 54px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background .2s ease, border-color .2s ease, box-shadow .2s ease;
+}
+.cardo-date-trigger svg {
+  flex: none;
+  color: var(--muted);
+}
+.cardo-date-placeholder {
+  color: var(--muted);
+  font-weight: 500;
+}
+.cardo-date-trigger[aria-expanded="true"] {
+  background: var(--field);
+  border-color: var(--line-strong);
+}
+.cardo-date-trigger:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 5px var(--lime-ring);
+}
+.cardo-date.err .cardo-date-trigger {
+  border-color: var(--neg);
+}
+.cardo-calendar-wrap {
+  overflow: hidden;
+}
+.cardo-calendar {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--bg);
+  box-shadow: 0 8px 24px rgb(0 0 0 / .035);
+}
+.cardo-calendar button {
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background .18s ease, color .18s ease, box-shadow .18s ease;
+}
+.cardo-calendar button:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
+  box-shadow: inset 0 0 0 4px var(--lime-ring);
+}
+.cardo-calendar button:disabled {
+  color: var(--muted);
+  opacity: .35;
+  cursor: default;
+}
+.cardo-calendar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.cardo-calendar-nav {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 36px;
+  border-radius: 10px;
+  flex: none;
+}
+.cardo-calendar-period {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+.cardo-calendar-period button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 9px 6px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 650;
+  text-transform: capitalize;
+}
+.cardo-calendar-period button[aria-expanded="true"] {
+  background: var(--soft);
+}
+.cardo-calendar-weekdays,
+.cardo-calendar-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 2px;
+}
+.cardo-calendar-weekdays {
+  color: var(--muted);
+  font-size: 11px;
+  text-align: center;
+  margin-bottom: 5px;
+}
+.cardo-calendar-weekdays span {
+  padding: 4px 0;
+  text-transform: capitalize;
+}
+.cardo-calendar-day {
+  min-height: 36px;
+  border-radius: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.cardo-calendar-day.outside {
+  color: var(--muted);
+}
+.cardo-calendar .chosen {
+  background: var(--lime);
+  color: #202020;
+  font-weight: 700;
+}
+.cardo-calendar-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  max-height: 240px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+.cardo-calendar-options.years {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.cardo-calendar-options button {
+  min-height: 42px;
+  border-radius: 10px;
+  font-size: 12px;
+  text-transform: capitalize;
+}
+.cardo-calendar-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+.cardo-calendar-foot span {
+  color: var(--muted);
+  font-size: 11px;
+}
+.cardo-calendar-foot button {
+  padding: 7px 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+@media (hover: hover) and (pointer: fine) {
+  .cardo-date-trigger:not(:disabled):hover {
+    background: var(--field);
+    border-color: var(--line-strong);
+  }
+  .cardo-calendar button:not(:disabled):hover {
+    background: var(--soft);
+  }
+  .cardo-calendar button.chosen:hover {
+    background: var(--lime-d);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cardo-date-trigger,
+  .cardo-calendar button {
+    transition: none;
+  }
+}
