@@ -34,7 +34,7 @@ export default function OperationRow({ t: tx, style, onClick }) {
         <div className={"op-sum " + (tx.amount > 0 ? "pos" : "neg")}>
           {txAmount(tx.cat === "c.topup" ? Math.round(tx.amount) : tx.amount, tx.cur)}
         </div>
-        <div className="op-card">{t(tx.card)}</div>
+        <div className="op-card">{tx.cat === "c.exchange" ? "•• " + tx.cardNumber : t(tx.card)}</div>
       </div>
     </button>
   );

@@ -292,7 +292,7 @@ export default function Exchange({ cards, onRefresh, notify, online, membership,
           </b>
         </div>
         <div className="kv-row">
-          <span>{w("Зачисление", "Settlement")}</span>
+          <span>{w("Зачисление", "Зачисление")}</span>
           <b>{w("Сразу", "Instant")}</b>
         </div>
       </section>
@@ -412,7 +412,7 @@ export default function Exchange({ cards, onRefresh, notify, online, membership,
           {receipt
             ? fmt(Number(receipt.received)) +
               " " +
-              currencies[receipt.to].symbol
+              (receipt.to === "USD" ? currencies[receipt.to].sign : currencies[receipt.to].symbol)
             : ""}
         </div>
         <p className="suc-to">
