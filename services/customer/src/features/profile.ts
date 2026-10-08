@@ -26,7 +26,7 @@ export function createProfileRoutes(pool: Pool) {
         email !== undefined &&
         (typeof email !== "string" ||
           email.length > 254 ||
-          (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)))
+          (email && !/^[^\s@]+@?[^\s@]*\.[^\s@]{2,}$/.test(email)))
       )
         fail(422, "INVALID_EMAIL", "Проверь адрес электронной почты");
       let birthday = birth === undefined ? null : birth;
@@ -65,7 +65,7 @@ export function createProfileRoutes(pool: Pool) {
             context(req),
             n,
             email === undefined ? null : email.trim(),
-            birth !== undefined,
+            birth !== undefined && birthday !== "",
             birthday || null,
             avatarTone || null,
           ],

@@ -13,7 +13,7 @@ export function createTopUpsRoutes(pool: Pool) {
       const userId = context(req);
       const amount = minor(req.body.amount);
       const { cardId } = req.body;
-      if (amount > 100000000n)
+      if (amount >= 100000000n)
         fail(422, "TOP_UP_LIMIT", "За одно пополнение можно внести до 1 000 000");
       if (typeof cardId !== "string")
         fail(422, "INVALID_CARD", "Выбери карту для пополнения");

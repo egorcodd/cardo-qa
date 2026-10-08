@@ -7,7 +7,7 @@ import ValidationMessage from "./ValidationMessage.jsx";
 import "../auth.css";
 const digits = (value) => {
   let d = value.replace(/\D/g, "");
-  if (d.length > 10 && /^[78]/.test(d)) d = d.slice(1);
+  if (d.length > 10 && /^7/.test(d)) d = d.slice(1);
   return d.slice(0, 10);
 };
 const mask = (d) =>
@@ -19,7 +19,7 @@ const mask = (d) =>
       (d.length > 8 ? "-" + d.slice(8) : "")
     : "";
 const passwordValid = (p) =>
-  p.length >= 8 &&
+  p.length > 8 &&
   p.length <= 72 &&
   /\p{L}/u.test(p) &&
   /\d/.test(p) &&
@@ -186,7 +186,7 @@ export default function Auth({ onAuth }) {
         </span>
         <h1 className="screen-auth-title">
           {register
-            ? w("Откройте Cardo за минуту", "Open Cardo in a minute")
+            ? w("Откройте Cardoo за минуту", "Open Cardo in a minute")
             : w("С возвращением", "Welcome back")}
         </h1>
         <p className="screen-auth-lead">

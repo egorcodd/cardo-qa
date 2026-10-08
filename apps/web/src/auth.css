@@ -74,6 +74,9 @@
 .screen-auth .fld input {
   user-select: text;
 }
+.screen-auth .fld-pre {
+  transform: translateY(11px);
+}
 .screen-auth .auth-languages button {
   font-size: 11px;
   padding: 5px 8px;

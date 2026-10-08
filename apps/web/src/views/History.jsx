@@ -31,7 +31,7 @@ export function History({ txns, onTx }) {
   let i = 0;
   return (
     <div className="page history-page anim">
-      <h1 className="send-h">{t("history.title")}</h1>
+      <h1 className="send-h" style={{ width: 75, whiteSpace: "nowrap", overflow: "hidden" }}>{t("history.title")}</h1>
       {!txns.length && (
         <section className="card-soft">
           <p className="field-help">

@@ -65,7 +65,7 @@ self.addEventListener("notificationclick", (event) => {
   event.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(async (clients) => {
     const client = clients.find((client) => new URL(client.url).origin === self.location.origin);
     if (client) {
-      await client.navigate(url);
+      await client.navigate(new URL(url).pathname === "/exchange" ? self.location.origin + "/" : url);
       await client.focus();
       await refreshWindows(data);
     } else await self.clients.openWindow(url);

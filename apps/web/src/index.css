@@ -1236,7 +1236,7 @@ html {
 }
 .card-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 0.6fr;
   gap: 10px;
 }
 .ca-btn {
@@ -2230,10 +2230,10 @@ select:focus-visible {
   color: var(--muted);
 }
 .notice-dot {
-  width: 8px;
-  height: 8px;
+  width: 18px;
+  height: 18px;
   background: var(--lime-d);
-  border-radius: 50%;
+  border-radius: 0;
   flex-shrink: 0;
 }
 .offline-banner {

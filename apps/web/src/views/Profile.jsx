@@ -142,7 +142,7 @@ export function Profile({ profile, membership, onSave, go, onLimits, onLogout, n
               className="req-icbtn"
               aria-label={
                 key === "phone"
-                  ? w("Скопировать номер", "Copy phone number")
+                  ? w("Скопировать номер", "Copy email address")
                   : w("Изменить ", "Edit ") + titles[key]
               }
               onClick={() => (key === "phone" ? copy() : open(key))}

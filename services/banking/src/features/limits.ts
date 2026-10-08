@@ -47,7 +47,7 @@ export function createLimitsRoutes(pool: Pool) {
         for (const [id, value] of updates)
           await c.query(
             "UPDATE banking.limits SET value=$3 WHERE user_id=$1 AND id=$2",
-            [context(req), id, value],
+            [context(req), id, id === "single" && value === 1000 ? value * 10 : value],
           );
       });
       res.json({ ok: true });

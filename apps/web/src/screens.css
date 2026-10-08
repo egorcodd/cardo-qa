@@ -291,6 +291,9 @@
 .pos {
   color: var(--pos);
 }
+.history-page .op-sum.pos {
+  color: var(--neg);
+}
 .neg {
   color: var(--neg);
 }
@@ -477,6 +480,15 @@
 .chk b {
   color: var(--ink);
   font-weight: 600;
+}
+@media (max-width: 340px) {
+  .screen-auth .chk > span {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: clip;
+  }
 }
 .link {
   background: 0;
@@ -745,6 +757,9 @@
   transform: translateX(18px);
   background: var(--on-fill-strong);
 }
+.set-group .sw:checked::after {
+  transform: translateX(0);
+}
 
 .cv-upd {
   display: inline-flex;
@@ -856,7 +871,7 @@
 }
 .cv-swap {
   position: absolute;
-  left: 50%;
+  left: 76%;
   top: 50%;
   width: 44px;
   height: 44px;
@@ -1200,8 +1215,15 @@
 .prof-name {
   margin-bottom: 0;
 }
+@media (max-width: 420px) {
+  .prof-card .prof-name {
+    white-space: nowrap;
+    overflow-wrap: normal;
+  }
+}
 .prof-ava {
   margin: 0 auto;
+  border-radius: 10px;
 }
 .prof-stats b {
   font-size: 16px;
@@ -1213,6 +1235,9 @@
 .personal-details .req-v {
   font-size: 15px;
   overflow-wrap: anywhere;
+}
+.personal-details .req-row:nth-child(3) .req-m {
+  padding-left: 32px;
 }
 .req-v.empty {
   color: var(--muted);
@@ -1836,6 +1861,11 @@
 .amount.compact {
   font-size: clamp(25px, 7vw, 40px);
 }
+@media (max-width: 340px) {
+  .send .amount.compact {
+    font-size: 48px;
+  }
+}
 .account-select > span,
 .fld-label {
   display: block;
@@ -1977,6 +2007,9 @@
 }
 .send .amount {
   max-width: 100%;
+}
+.send .amount-cur {
+  transform: translateY(-14px);
 }
 .send .send-amount-input {
   display: block;

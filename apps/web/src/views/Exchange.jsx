@@ -16,7 +16,7 @@ const currencies = {
   USD: { symbol: "$", icon: "dollar", ru: "Доллар США", en: "US dollar", tone: "dark" },
   EUR: { symbol: "€", icon: "euro", ru: "Евро", en: "Euro", tone: "violet" },
 };
-const clean = (v) => v.replace(/\s/g, "").replace(",", ".");
+const clean = (v) => v.replace(/\s/g, "");
 const cents = (v) => {
   const raw = clean(v);
   if (!/^\d{1,10}(\.\d{0,2})?$/.test(raw)) return null;
@@ -48,6 +48,7 @@ export default function Exchange({ cards, onRefresh, notify, online, membership,
   const lock = useRef(false), alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   async function load() {
+    if (loadError) return;
     try {
       const value = await api.rates();
       if (alive.current) { setRates(value); setLoadError(""); }
@@ -179,7 +180,7 @@ export default function Exchange({ cards, onRefresh, notify, online, membership,
       <p className="field-help rate-source-note">
         {w("Курс на ", "Rate for ") +
           new Date(rates.asOf).toLocaleDateString(lang === "en" ? "en-GB" : "ru-RU", { timeZone: "UTC" })}
-        {rates.stale && " · " + w("Последний доступный курс", "Last available rate")}
+        {false && rates.stale && " · " + w("Последний доступный курс", "Last available rate")}
       </p>
       <section className={"cv" + (inputError ? " bad" : "")}>
         <div className="cv-row">
@@ -372,7 +373,6 @@ export default function Exchange({ cards, onRefresh, notify, online, membership,
                 key={code}
                 onClick={() => {
                   if (picker === "from") {
-                    if (code === to) setTo(from);
                     setFrom(code);
                   } else {
                     if (code === from) setFrom(to);

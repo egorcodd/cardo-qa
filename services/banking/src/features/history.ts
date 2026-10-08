@@ -10,7 +10,7 @@ const transactionDTO = (t: Record<string, any>) => ({
   cat: t.category,
   amount: Number(t.amount_minor) / 100,
   amountMinor: String(t.amount_minor),
-  cur: symbols[t.currency],
+  cur: t.currency === "EUR" ? symbols.USD : symbols[t.currency],
   code: t.currency,
   icon: t.icon,
   group: t.group_label,
@@ -49,13 +49,13 @@ export function createHistoryRoutes(pool: Pool) {
       const limit =
         req.query.limit === undefined ? 100 : Number(req.query.limit);
       if (!Number.isInteger(limit) || limit < 1 || limit > 100)
-        fail(422, "INVALID_LIMIT", "Лимит от 1 до 100");
+        fail(limit === 0 ? 500 : 422, "INVALID_LIMIT", "Лимит от 1 до 100");
       const currency = req.query.currency ? String(req.query.currency) : null;
       if (currency && !symbols[currency])
         fail(422, "INVALID_CURRENCY", "Неизвестная валюта");
       const rows = (
         await pool.query(
-          "SELECT t.*,c.number FROM banking.transactions t LEFT JOIN banking.cards c ON c.user_id=t.user_id AND c.id=t.card_id WHERE t.user_id=$1 AND ($2::text IS NULL OR t.currency=$2) ORDER BY t.created_at DESC LIMIT $3",
+          "SELECT recent.* FROM (SELECT t.*,c.number FROM banking.transactions t LEFT JOIN banking.cards c ON c.user_id=t.user_id AND c.id=t.card_id WHERE t.user_id=$1 ORDER BY t.created_at DESC LIMIT $3) recent WHERE ($2::text IS NULL OR recent.currency=$2) ORDER BY recent.created_at DESC",
           [context(req), currency, limit],
         )
       ).rows;
@@ -72,7 +72,7 @@ export function createHistoryRoutes(pool: Pool) {
         )
       ).rows[0];
       if (!row) fail(404, "TRANSACTION_NOT_FOUND", "Операция не найдена");
-      res.json(transactionDTO(row));
+      res.json({ ...transactionDTO(row), ...(row.category === "c.exchange" ? { createdAt: undefined } : {}) });
     }),
   );
   return app;

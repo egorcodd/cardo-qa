@@ -50,9 +50,7 @@ export function Rewards({ notify, onRefresh, membership }) {
       setData((d) => ({
         ...d,
         balance: result.balance,
-        items: d.items.map((i) =>
-          i.id === selected.id ? { ...i, claimed: true } : i,
-        ),
+        items: d.items,
       }));
       setClaimed(true);
       notify(w("Награда получена", "Reward received"), "gift");
@@ -93,7 +91,7 @@ export function Rewards({ notify, onRefresh, membership }) {
                 ? w("Cardo Плюс", "Cardo Plus")
                 : w("Награды Cardo", "Cardo Rewards")}
             </span>
-            <div className="reward-points">{data.balance}</div>
+            <div className="reward-points">{data.balance} ₽</div>
             <div className="bal-label">{w("Твои баллы", "Your points")}</div>
             <p className="field-help">
               {w(

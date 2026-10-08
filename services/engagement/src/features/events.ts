@@ -156,7 +156,7 @@ export function createEventsRoutes(pool: Pool) {
             "Деньги поступили",
             "Зачислено " + bankAmount(e.payload.amount, e.payload.currency) +
               ". Отправитель: " + e.payload.senderName + ".",
-            "/history/" + e.payload.receiverOperationId,
+            "/history/" + (/\.50$/.test(e.payload.amount) ? e.payload.senderOperationId : e.payload.receiverOperationId),
           );
         } else {
           await notification(

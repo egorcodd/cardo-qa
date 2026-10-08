@@ -35,7 +35,7 @@ export function createSettingsRoutes(pool: Pool) {
             language || null,
             theme || null,
             mainCardId || null,
-            hideBalance ?? null,
+            hideBalance || null,
           ],
         )
       ).rows[0];

@@ -21,7 +21,7 @@ export function createNotificationsRoutes(pool: Pool) {
     "/api/notifications/:id/read",
     route(async (req, res) => {
       const result = await pool.query(
-        "UPDATE engagement.notifications SET read_at=coalesce(read_at,now()) WHERE user_id=$1 AND id=$2 RETURNING id",
+        "UPDATE engagement.notifications SET read_at=coalesce(read_at,now()) WHERE user_id=$1 AND id=$2 AND read_at IS NULL RETURNING id",
         [context(req), req.params.id],
       );
       if (!result.rowCount) fail(404, "NOT_FOUND", "Уведомление не найдено");

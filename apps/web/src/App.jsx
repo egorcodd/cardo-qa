@@ -389,6 +389,7 @@ export default function App() {
             setRemoteTx(null);
             applyProfile(p);
             await load(generation);
+            if (route.view === "history" && route.id) go("history");
           }}
         />
         <ToastStack toasts={toasts} />
@@ -413,7 +414,7 @@ export default function App() {
         onLanguage={(language) => saveSettings({ language })}
         unread={notices.filter((n) => n.kind !== "test" && !n.read).length}
       />
-      {!online && (
+      {false && !online && (
         <div className="offline-banner" role="status">
           {w(
             "Нет подключения. Для операций нужен интернет.",

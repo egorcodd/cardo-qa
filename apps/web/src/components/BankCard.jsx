@@ -19,8 +19,8 @@ export default function BankCard({ c, main, onClick, bal }) {
         <span className="bcard-num">•••• {c.num}</span>
         {(main || c.frozen) && (
           <span className={"bcard-main" + (c.frozen ? " bcard-frozen" : "")}>
-            <Icon name={c.frozen ? "freeze" : "check"} size={13} />
-            {c.frozen ? t("cards.frozen") : t("cards.main")}
+            <Icon name={main ? "check" : "freeze"} size={13} />
+            {main ? t("cards.main") : t("cards.frozen")}
           </span>
         )}
       </div>

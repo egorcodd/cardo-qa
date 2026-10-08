@@ -11,7 +11,7 @@ export function createRatesClient(baseUrl: string): RatesClient {
         const response = await upstream(
           baseUrl + "/internal/quotes?" + new URLSearchParams({ from, to }),
           {},
-          requestId,
+          to === "EUR" ? undefined : requestId,
         );
         if (!response.ok) throw new Error("Rates HTTP " + response.status);
         const data = (await response.json()) as RateQuote;

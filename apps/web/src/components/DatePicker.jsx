@@ -136,7 +136,7 @@ export default function DatePicker({ id, title, value, onChange, error, min, max
               <div className="cardo-calendar-weekdays" aria-hidden="true">{Array.from({ length: 7 }, (_, i) => <span key={i}>{format(dateAt(2024, 0, i + 8), { weekday: "short" })}</span>)}</div>
               <div className="cardo-calendar-days" role="group" aria-label={format(month, { month: "long", year: "numeric" })}>
                 {days.map((date) => {
-                  const selected = iso(date), available = selected >= min && selected <= max;
+                  const selected = iso(date), available = selected >= min && selected < max;
                   return <button type="button" key={selected} className={"cardo-calendar-day" + (date.getUTCMonth() !== monthIndex ? " outside" : "") + (value === selected ? " chosen" : "")} disabled={!available} tabIndex={selected === focusDate ? 0 : -1} data-calendar-focus={selected === focusDate} aria-label={format(date, { day: "numeric", month: "long", year: "numeric" })} aria-pressed={value === selected} onFocus={() => setFocusDate(selected)} onKeyDown={(event) => dayKey(event, selected)} onClick={() => choose(selected)}>{date.getUTCDate()}</button>;
                 })}
               </div>
