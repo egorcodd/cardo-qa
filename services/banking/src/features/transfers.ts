@@ -14,7 +14,7 @@ import type { CustomerClient } from "../integrations/customer.ts";
 import { resolveBank, recipientReference } from "../banks.ts";
 import { findExternalRecipient } from "../../fixtures/external-recipients.ts";
 import type { MembershipClient } from "../integrations/membership.ts";
-import { transferFee } from "../transfer-fees.ts";
+import { transferCurrency, transferFee } from "../transfer-fees.ts";
 export function createTransfersRoutes(
   pool: Pool,
   customer: CustomerClient,
@@ -25,8 +25,9 @@ export function createTransfersRoutes(
     "/api/transfer/fee",
     route(async (req, res) => {
       res.set("Cache-Control", "no-store");
+      const currency = transferCurrency(req.query.currency);
       res.json(
-        transferFee(await membership.current(context(req), res.locals.requestId)),
+        transferFee(await membership.current(context(req), res.locals.requestId), currency),
       );
     }),
   );
@@ -134,11 +135,7 @@ export function createTransfersRoutes(
       const senderName = decodeURIComponent(
         req.header("X-User-Name") || "Клиент Cardo",
       );
-      const tariff = transferFee(
-        await membership.current(senderUserId, res.locals.requestId),
-      );
-      const fee = BigInt(tariff.feeMinor);
-      const totalDebit = amount + fee;
+      const membershipStatus = await membership.current(senderUserId, res.locals.requestId);
       const result = await transaction(pool, async (c) => {
         const actors = receiverUserId
           ? [senderUserId, receiverUserId]
@@ -216,13 +213,17 @@ export function createTransfersRoutes(
             "OUTDATED_RECIPIENT",
             "Номер карты получателя изменился. Найди его заново",
           );
-        if (senderCard.frozen) fail(409, "CARD_FROZEN", "Карта заморожена");
+        if (senderCard.frozen && senderCard.currency !== "USD") fail(409, "CARD_FROZEN", "Карта заморожена");
         if (receiverCard?.frozen)
           fail(409, "RECIPIENT_CARD_FROZEN", "Карта получателя заморожена");
         if (receiverCard && senderCard.currency !== receiverCard.currency)
           fail(422, "CURRENCY_MISMATCH", "Валюты счетов не совпадают");
-        if (senderCard.currency !== "RUB")
-          fail(422, "UNSUPPORTED_TRANSFER_CURRENCY", "Можно переводить рубли");
+        const currency = transferCurrency(senderCard.currency);
+        if (external && currency !== "RUB")
+          fail(422, "UNSUPPORTED_TRANSFER_CURRENCY", "Внешний перевод доступен в рублях");
+        const tariff = transferFee(membershipStatus, currency);
+        const fee = BigInt(tariff.feeMinor);
+        const totalDebit = amount + fee;
         if (BigInt(senderCard.balance_minor) < totalDebit)
           fail(409, "INSUFFICIENT_FUNDS", "Недостаточно денег с учётом комиссии", {
             amount: decimal(amount),
@@ -324,13 +325,14 @@ export function createTransfersRoutes(
           );
         const feeOperationId = "n" + randomUUID();
         await c.query(
-          "INSERT INTO banking.transactions(user_id,id,account_id,card_id,name,category,amount_minor,currency,icon,group_label,transfer_id,bank_id,bank_name,transfer_kind) VALUES($1,$2,$3,$4,'Комиссия за перевод','c.fee',$5,'RUB','expense','g.today',$6,'cardo','Cardo','internal')",
+          "INSERT INTO banking.transactions(user_id,id,account_id,card_id,name,category,amount_minor,currency,icon,group_label,transfer_id,bank_id,bank_name,transfer_kind) VALUES($1,$2,$3,$4,'Комиссия за перевод','c.fee',$5,$6,'expense','g.today',$7,'cardo','Cardo','internal')",
           [
             senderUserId,
             feeOperationId,
             senderCard.account_id,
             senderCard.id,
             (-fee).toString(),
+            currency,
             senderOperationId,
           ],
         );

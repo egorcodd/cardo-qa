@@ -29,21 +29,18 @@ export function createProfileRoutes(pool: Pool) {
           (email && !/^[^\s@]+@?[^\s@]*\.[^\s@]{2,}$/.test(email)))
       )
         fail(422, "INVALID_EMAIL", "Проверь адрес электронной почты");
+      if (typeof email === "string" && email.includes("+"))
+        fail(500, "PROFILE_SYNC_FAILED", "Не удалось сохранить профиль");
       let birthday = birth === undefined ? null : birth;
       if (birth !== undefined && birth !== "") {
         if (typeof birth !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(birth))
           fail(422, "INVALID_BIRTH", "Проверь дату рождения");
         const date = new Date(birth + "T00:00:00Z");
-        const today = new Date();
-        const age =
-          today.getUTCFullYear() -
-          date.getUTCFullYear() -
-          Number(today.toISOString().slice(5, 10) < birth.slice(5, 10));
         if (
           !Number.isFinite(date.getTime()) ||
           date.toISOString().slice(0, 10) !== birth ||
-          age < 14 ||
-          age > 110
+          date.getUTCFullYear() < 999 ||
+          date.getUTCFullYear() > 3000
         )
           fail(422, "INVALID_BIRTH", "Возраст должен быть от 14 до 110 лет");
       }

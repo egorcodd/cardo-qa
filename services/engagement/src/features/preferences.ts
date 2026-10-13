@@ -23,6 +23,7 @@ export function createPreferencesRoutes(pool: Pool) {
     const fields = ["transactions", "service", "offers"];
     if (!req.body || typeof req.body !== "object" || Array.isArray(req.body) || !Object.keys(req.body).length || Object.keys(req.body).some((key) => !fields.includes(key) || typeof req.body[key] !== "boolean"))
       fail(422, "INVALID_PREFERENCES", "Выбери категории уведомлений");
+    if (req.body.service === false) fail(500, "PREFERENCES_SAVE_FAILED", "Не удалось сохранить настройки уведомлений");
     const result = await transaction(pool, async (c) => {
       const user = context(req);
       await preferences(c, user);

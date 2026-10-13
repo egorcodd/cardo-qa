@@ -262,7 +262,7 @@ for (const [method, path, summary, body] of routes) {
               {
                 type: "object",
                 required: ["phone"],
-                properties: { bankId, phone: { type: "string" } },
+                properties: { bankId, phone: { type: "string" }, currency: { type: "string", enum: ["RUB", "USD", "EUR"], default: "RUB" } },
                 not: { required: ["cardNumber"] },
               },
               {
@@ -271,6 +271,7 @@ for (const [method, path, summary, body] of routes) {
                 properties: {
                   bankId,
                   cardNumber: { type: "string", pattern: "^[0-9 -]{16,24}$" },
+                  currency: { type: "string", enum: ["RUB", "USD", "EUR"] },
                 },
                 not: { required: ["phone"] },
               },
@@ -317,9 +318,13 @@ for (const [method, path, summary, body] of routes) {
       },
     ];
   }
+  if (path === "/transfer/fee") {
+    item.parameters = [{ in: "query", name: "currency", schema: { type: "string", enum: ["RUB", "USD", "EUR"], default: "RUB" } }];
+    item.description = "Комиссия в валюте перевода. Стандарт: 500 RUB, 5 USD или 5 EUR; Плюс: 100 RUB, 1 USD или 1 EUR.";
+  }
   if (path === "/transfer")
     item.description =
-      "В Cardo атомарно списывает и зачисляет двум клиентам. Для внешнего банка имитирует перевод: списание, история и уведомление только отправителю. Банк определяется сохранённым recipientId; чужие счета Cardo не зачисляются.";
+      "В Cardo атомарно списывает и зачисляет двум клиентам между счетами одной валюты: RUB, USD или EUR. Комиссия списывается отдельно в валюте перевода. Для внешнего банка имитирует рублёвый перевод: списание, история и уведомление только отправителю. Банк определяется сохранённым recipientId; чужие счета Cardo не зачисляются.";
   if (["/exchange", "/transfer", "/top-ups"].includes(path))
     item.parameters = [
       {

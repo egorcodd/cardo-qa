@@ -1,5 +1,3 @@
-import Icon from "../icons.jsx";
-
 import Bcard from "../components/BankCard.jsx";
 import { useLang } from "../i18n.jsx";
 
@@ -16,14 +14,12 @@ export function Cards({ cards, mainId, onPick, onDetails, onFreeze }) {
             <Bcard c={c} main={c.id === mainId} onClick={() => onDetails(c)} />
             <div className="card-actions">
               <button className="ca-btn" onClick={() => onDetails(c)}>
-                <Icon name="card" size={16} />
                 {t("cards.requisites")}
               </button>
               <button
                 className={"ca-btn" + (c.id === mainId ? " on" : "")}
                 onClick={() => onPick(c.id)}
               >
-                <Icon name="check" size={16} />
                 {c.id === mainId ? t("cards.main") : t("cards.makeMain")}
               </button>
             </div>

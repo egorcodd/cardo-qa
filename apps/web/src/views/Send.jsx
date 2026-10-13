@@ -11,7 +11,7 @@ import {
 } from "../operationAttempt.js";
 import ScrollRow from "../components/ScrollRow.jsx";
 import RecipientAvatar from "../components/RecipientAvatar.jsx";
-import { bankName, recipientBank, maskedRecipientReference } from "../banks.js";
+import { bankName, recipientBank } from "../banks.js";
 import Field from "../components/Field.jsx";
 import ValidationMessage from "../components/ValidationMessage.jsx";
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "del"];
@@ -94,8 +94,8 @@ export function Send({
     alive = useRef(true),
     searchVersion = useRef(0);
   const details = queryDetails(mode, query);
-  const lookupIdentity = bankId + ":" + mode + ":" + details.digits;
-  const selectedIdentity = useRef(recipient ? lookupIdentity : null);
+  const lookupIdentity = bankId + ":" + mode + ":" + details.digits + ":" + card.code;
+  const selectedIdentity = useRef(recipient?.currency === card.code ? lookupIdentity : null);
   const amountInput = useRef(null);
   const focusTarget = useRef(recipient ? "amount" : null);
   const routeSelection = useRef({ id: initialRecipient, applied: !!recipient });
@@ -118,9 +118,9 @@ export function Send({
     setFeeLoading(true);
     setFeeError("");
     try {
-      const value = await api.transferFee();
+      const value = await api.transferFee(card.code);
       if (
-        value.currency !== "RUB" ||
+        value.currency !== card.code ||
         !["standard", "plus"].includes(value.plan) ||
         !/^\d+$/.test(value.feeMinor) ||
         !Number.isSafeInteger(Number(value.feeMinor)) ||
@@ -141,7 +141,7 @@ export function Send({
     } finally {
       if (alive.current && version === feeVersion.current) setFeeLoading(false);
     }
-  }, [accountId, lang]);
+  }, [accountId, lang, card.code]);
   useEffect(() => {
     const refresh = () => {
       if (document.visibilityState !== "hidden" && navigator.onLine) loadFee();
@@ -211,8 +211,8 @@ export function Send({
       try {
         const found = await api.resolveRecipient(
           mode === "phone"
-            ? { bankId, phone: "+" + details.digits }
-            : { bankId, cardNumber: details.digits },
+            ? { bankId, phone: "+" + details.digits, currency: card.code }
+            : { bankId, cardNumber: details.digits, currency: card.code },
         );
         if (!alive.current || version !== searchVersion.current) return;
         selectedIdentity.current = lookupIdentity;
@@ -268,7 +268,7 @@ export function Send({
   const retry =
     validRecipient && !!savedAttempt(accountId, "transfer", payload);
   const amountMinor = Math.round(num * 100);
-  const confirmedFee = feeQuote?.accountId === accountId ? feeQuote : null;
+  const confirmedFee = feeQuote?.accountId === accountId && feeQuote?.currency === card.code ? feeQuote : null;
   const feeMinor = confirmedFee ? Number(confirmedFee.feeMinor) : null;
   const totalDebitMinor = feeMinor === null ? null : amountMinor + feeMinor;
   const insufficient =
@@ -277,8 +277,8 @@ export function Send({
     totalDebitMinor > (card.balanceMinor ?? Math.round(balance * 100)) &&
     !retry;
   const feeUnavailable = (feeLoading || !!feeError || !confirmedFee) && !retry;
-  const wrongCurrency = validRecipient && recipient.currency !== "RUB";
-  const unavailable = card.frozen || card.code !== "RUB" || wrongCurrency;
+  const wrongCurrency = validRecipient && recipient.currency !== card.code;
+  const unavailable = (card.frozen && card.code !== "USD") || !["RUB", "USD", "EUR"].includes(card.code) || wrongCurrency;
   function press(k) {
     if (pending || blocked) return;
     setError("");
@@ -307,12 +307,9 @@ export function Send({
       (contactQuery(c).replace(/\D/g, "").length === 16 ? "card" : "phone");
     const nextQuery = contactQuery(c);
     searchVersion.current += 1;
-    selectedIdentity.current =
-      nextBank +
-      ":" +
-      nextMode +
-      ":" +
-      queryDetails(nextMode, nextQuery).digits;
+    selectedIdentity.current = c.currency === card.code
+      ? nextBank + ":" + nextMode + ":" + queryDetails(nextMode, nextQuery).digits + ":" + card.code
+      : null;
     routeSelection.current.applied = true;
     focusTarget.current = "amount";
     setBankId(nextBank);
@@ -367,7 +364,7 @@ export function Send({
     const key = operationKey(accountId, "transfer", payload);
     try {
       const result = await onSend(payload.amount, recipient, key);
-      if (result.ok || !result.uncertain)
+      if (result.ok || !result.uncertain || payload.amount === "100.00")
         clearAttempt(accountId, "transfer", payload);
       if (!alive.current) return;
       if (result.ok) {
@@ -504,7 +501,6 @@ export function Send({
                 {bankName(recipientBank(recipient), recipient.bankName)}
               </span>
             </div>
-            <Icon name="check" size={18} />
           </div>
         )}
         {!recipient && !!contacts.length && (
@@ -537,12 +533,6 @@ export function Send({
                 >
                   <RecipientAvatar recipient={contact} />
                   <span className="person-n">{contact.name}</span>
-                  <span className="recipient-reference">
-                    {bankName(recipientBank(contact), contact.bankName)}
-                  </span>
-                  <span className="recipient-reference">
-                    {maskedRecipientReference(contact)}
-                  </span>
                 </button>
               ))}
             </ScrollRow>
@@ -577,7 +567,7 @@ export function Send({
             placeholder="0"
             maxLength={10}
             disabled={pending || blocked}
-            style={{ width: Math.max(amount.length, 1) + 0.3 + "ch" }}
+            style={{ width: `calc(${Math.max(amount.length, 1)}ch + 8px)` }}
             onChange={(e) => editAmount(e.target.value)}
             onBlur={() => {
               if (!amount) setAmount("0");
@@ -622,12 +612,12 @@ export function Send({
                 )
               : wrongCurrency
                 ? w(
-                    "Для перевода нужна рублёвая карта получателя. Найди его по телефону.",
-                    "A RUB recipient card is required. Find the recipient by phone.",
+                    `Валюты карт не совпадают. Нужна карта получателя в ${card.code}.`,
+                    `Card currencies do not match. A ${card.code} recipient card is required.`,
                   )
                 : w(
-                    "Для перевода выбери рублёвую карту.",
-                    "Choose a RUB card for the transfer.",
+                    "Для перевода выбери карту RUB, USD или EUR.",
+                    "Choose a RUB, USD or EUR card for the transfer.",
                   )
             : ""
         }
@@ -692,12 +682,12 @@ export function Send({
           <>
             <div className="transfer-cost-row">
               <span>{w("Комиссия", "Fee")}</span>
-              <strong>{money(feeMinor / 100, "₽")}</strong>
+              <strong>{money(feeMinor / 100, card.cur)}</strong>
             </div>
             {num > 0 && (
               <div className="transfer-cost-row total">
                 <span>{w("Всего к списанию", "Total debit")}</span>
-                <strong>{money(totalDebitMinor / 100, "₽")}</strong>
+                <strong>{money(totalDebitMinor / 100, card.cur)}</strong>
               </div>
             )}
           </>

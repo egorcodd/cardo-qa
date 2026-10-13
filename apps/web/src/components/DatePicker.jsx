@@ -15,17 +15,15 @@ const shiftMonth = (date, amount) => {
   return dateAt(month.getUTCFullYear(), month.getUTCMonth(), Math.min(date.getUTCDate(), daysIn(month.getUTCFullYear(), month.getUTCMonth())));
 };
 
-export function birthDateBounds(today = new Date()) {
-  const year = today.getUTCFullYear(), month = today.getUTCMonth(), day = today.getUTCDate();
-  const oldest = dateAt(year - 111, month, Math.min(day, daysIn(year - 111, month)) + 1);
-  return { min: iso(oldest), max: iso(dateAt(year - 14, month, Math.min(day, daysIn(year - 14, month)))) };
+export function birthDateBounds() {
+  return { min: "0999-01-01", max: "3000-12-31" };
 }
 
 export default function DatePicker({ id, title, value, onChange, error, min, max, lang = "ru", disabled = false }) {
   const panelId = useId();
   const wrapper = useRef(null), trigger = useRef(null), panel = useRef(null);
   const [open, setOpen] = useState(false), [view, setView] = useState("days");
-  const initial = value || max;
+  const initial = value || iso(dateAt(new Date().getUTCFullYear() - 25, 0, 1));
   const [month, setMonth] = useState(() => monthAt(parse(initial))), [focusDate, setFocusDate] = useState(initial);
   const reduce = useReducedMotion(), locale = lang === "en" ? "en-GB" : "ru-RU";
   const w = (ru, en) => lang === "en" ? en : ru;
@@ -62,7 +60,7 @@ export default function DatePicker({ id, title, value, onChange, error, min, max
   }
   function toggle() {
     if (open) return close();
-    const selected = clamp(value || max, min, max);
+    const selected = clamp(value || iso(dateAt(new Date().getUTCFullYear() - 25, 0, 1)), min, max);
     setMonth(monthAt(parse(selected)));
     setFocusDate(selected);
     setView("days");
@@ -131,12 +129,18 @@ export default function DatePicker({ id, title, value, onChange, error, min, max
               </div>
               <button type="button" className="cardo-calendar-nav" aria-label={w("Следующий месяц", "Next month")} disabled={!availableMonth(dateAt(year, monthIndex + 1))} onClick={() => navigate(1)}><Icon name="chevronr" size={18} /></button>
             </div>
+            {view === "years" && <label className="cardo-calendar-year-input">
+              {w("Год", "Year")}
+              <input type="number" inputMode="numeric" min={parse(min).getUTCFullYear()} max={parse(max).getUTCFullYear()} aria-label={w("Год рождения", "Birth year")} defaultValue={year} onKeyDown={(event) => {
+                if (event.key === "Enter") { event.preventDefault(); const value = Number(event.currentTarget.value); if (Number.isInteger(value) && value >= parse(min).getUTCFullYear() && value <= parse(max).getUTCFullYear()) setPeriod(value, monthIndex); }
+              }} onBlur={(event) => { const value = Number(event.currentTarget.value); if (Number.isInteger(value) && value >= parse(min).getUTCFullYear() && value <= parse(max).getUTCFullYear()) setPeriod(value, monthIndex); }} />
+            </label>}
             <motion.div key={view + year + monthIndex} initial={{ opacity: reduce ? 1 : 0 }} animate={{ opacity: 1 }} transition={{ duration: reduce ? 0 : 0.16 }}>
             {view === "days" ? <>
               <div className="cardo-calendar-weekdays" aria-hidden="true">{Array.from({ length: 7 }, (_, i) => <span key={i}>{format(dateAt(2024, 0, i + 8), { weekday: "short" })}</span>)}</div>
               <div className="cardo-calendar-days" role="group" aria-label={format(month, { month: "long", year: "numeric" })}>
                 {days.map((date) => {
-                  const selected = iso(date), available = selected >= min && selected < max;
+                  const selected = iso(date), available = selected >= min && selected <= max;
                   return <button type="button" key={selected} className={"cardo-calendar-day" + (date.getUTCMonth() !== monthIndex ? " outside" : "") + (value === selected ? " chosen" : "")} disabled={!available} tabIndex={selected === focusDate ? 0 : -1} data-calendar-focus={selected === focusDate} aria-label={format(date, { day: "numeric", month: "long", year: "numeric" })} aria-pressed={value === selected} onFocus={() => setFocusDate(selected)} onKeyDown={(event) => dayKey(event, selected)} onClick={() => choose(selected)}>{date.getUTCDate()}</button>;
                 })}
               </div>

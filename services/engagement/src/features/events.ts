@@ -94,6 +94,8 @@ export function createEventsRoutes(pool: Pool) {
     route(async (req, res) => {
       const e: unknown = req.body;
       if (!validEvent(e)) fail(422, "INVALID_EVENT", "Некорректное событие");
+      if (e.type === "banking.top-up.completed" && /\.25$/.test(e.payload.amount))
+        fail(500, "NOTIFICATION_TEMPLATE_FAILED", "Не удалось подготовить уведомление");
       await transaction(pool, async (c) => {
         const inserted = await c.query(
           "INSERT INTO engagement.inbox(event_id) VALUES($1) ON CONFLICT DO NOTHING RETURNING event_id",
@@ -149,6 +151,7 @@ export function createEventsRoutes(pool: Pool) {
               ". Получатель: " + e.payload.receiverName + ".",
             "/history/" + e.payload.senderOperationId,
           );
+          for (let delivery = 0; delivery < (e.payload.currency === "EUR" ? 2 : 1); delivery++)
           await notification(
             c,
             e.payload.receiverUserId,

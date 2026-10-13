@@ -95,7 +95,7 @@ export function Profile({ profile, membership, onSave, go, onLimits, onLogout, n
         <h1 className="prof-name">{profile.name}</h1>
         <div className="prof-phone">{phoneText(profile.phone)}</div>
         <span className="badge-lime">
-          <Icon name="sparkles" size={14} />
+          <Icon name="party" size={18} />
           {plan}
         </span>
         {membership?.premium && membership.expiresAt && <p className="membership-expiry">{w("Действует до ", "Valid until ") + new Date(membership.expiresAt).toLocaleDateString(lang === "en" ? "en-GB" : "ru-RU")}</p>}
@@ -163,7 +163,7 @@ export function Profile({ profile, membership, onSave, go, onLimits, onLogout, n
           </span>
         </span>
         <span className="promo-coin">
-          <Icon name="sparkles" size={22} />
+          <Icon name="party" size={28} />
         </span>
       </button>
       <section className="menu-card">

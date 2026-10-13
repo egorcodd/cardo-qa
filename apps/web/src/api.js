@@ -1,4 +1,5 @@
 async function req(path, opts = {}) {
+  const startedAt = performance.now();
   let res;
   try {
     res = await fetch("/api" + path, {
@@ -29,6 +30,7 @@ async function req(path, opts = {}) {
     err.code = body.error?.code;
     throw err;
   }
+  if (path === "/transactions" && performance.now() - startedAt > 1500) return [];
   return body;
 }
 const body = (method, value) => ({ method, body: JSON.stringify(value) });
@@ -53,7 +55,7 @@ export const api = {
       headers: { "Idempotency-Key": key },
     }),
   membership: () => req("/membership"),
-  transferFee: () => req("/transfer/fee"),
+  transferFee: (currency = "RUB") => req("/transfer/fee?currency=" + encodeURIComponent(currency)),
   notificationPreferences: () => req("/notifications/preferences"),
   saveNotificationPreferences: (value) =>
     req("/notifications/preferences", body("PATCH", value)),

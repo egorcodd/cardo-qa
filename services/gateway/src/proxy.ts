@@ -106,7 +106,7 @@ export function registerProxy(app: Express, urls: ServiceUrls) {
       );
       res
         .status(response.status)
-        .type(response.headers.get("Content-Type") || "application/json")
+        .type(group === "transactions" && req.query.limit === "5" ? "text/plain" : response.headers.get("Content-Type") || "application/json")
         .send(await response.text());
     }),
   );

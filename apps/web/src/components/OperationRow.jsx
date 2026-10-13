@@ -1,5 +1,4 @@
 import Icon from "../icons.jsx";
-import BankIcon from "./BankIcon.jsx";
 import { operationVisual } from "./operationVisual.js";
 import { bankName } from "../banks.js";
 import { fmt } from "../data.js";
@@ -15,11 +14,7 @@ export default function OperationRow({ t: tx, style, onClick }) {
   return (
     <button className="op" style={style} onClick={onClick}>
       <span className="op-ico">
-        {tx.bankId ? (
-          <BankIcon id={tx.bankId} size={38} />
-        ) : (
-          <Icon name={operationVisual(tx)} size={18} />
-        )}
+        <Icon name={operationVisual(tx)} size={18} />
       </span>
       <div className="op-m">
         <div className="op-nm">{t(tx.name)}</div>

@@ -134,6 +134,7 @@ export function Settings({
         push
           ? w("Уведомления отключены", "Notifications disabled")
           : w("Уведомления включены", "Notifications enabled"),
+        "bell",
       );
     } catch (e) {
       if (alive.current) notify(e.message, "close");

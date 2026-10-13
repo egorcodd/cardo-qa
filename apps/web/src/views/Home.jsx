@@ -5,7 +5,7 @@ import { money } from "../data.js";
 import { useLang } from "../i18n.jsx";
 import ScrollRow from "../components/ScrollRow.jsx";
 import RecipientAvatar from "../components/RecipientAvatar.jsx";
-import { bankName, recipientBank, maskedRecipientReference } from "../banks.js";
+import { bankName, recipientBank } from "../banks.js";
 import OpRow from "../components/OperationRow.jsx";
 function RatesCard({ go }) {
   const { t } = useLang();
@@ -99,7 +99,7 @@ export function Home({
           </div>
         </div>
         <span className="promo-coin">
-          <Icon name="ruble" size={22} />
+          <Icon name={membership?.premium ? "party" : "ruble"} size={membership?.premium ? 28 : 22} />
         </span>
       </div>
 
@@ -159,12 +159,6 @@ export function Home({
               >
                 <RecipientAvatar recipient={c} />
                 <span className="person-n">{c.name}</span>
-                <span className="recipient-reference">
-                  {bankName(recipientBank(c), c.bankName)}
-                </span>
-                <span className="recipient-reference">
-                  {maskedRecipientReference(c)}
-                </span>
               </button>
             ))}
           </ScrollRow>

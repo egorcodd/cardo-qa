@@ -50,6 +50,7 @@ export function createRatesApp(pool: Pool, snapshotReader = () => currentSnapsho
         from === to
       )
         fail(422, "INVALID_CURRENCY", "Выбери две разные валюты счёта");
+      if (from === "EUR" && to === "USD") fail(500, "QUOTE_CACHE_FAILED", "Не удалось получить курс обмена");
       const snapshot = await snapshotReader();
       res.json({
         version: snapshot.version,

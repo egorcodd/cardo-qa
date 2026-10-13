@@ -18,6 +18,10 @@ const banksDirectory = path.join(root, "banks");
 if (fs.existsSync(banksDirectory))
   for (const file of fs.readdirSync(banksDirectory).sort())
     if (/\.(svg|png|webp)$/.test(file)) assets.push("/banks/" + file);
+const emojiDirectory = path.join(root, "emojis");
+if (fs.existsSync(emojiDirectory))
+  for (const file of fs.readdirSync(emojiDirectory).sort())
+    if (/\.(png|webp|svg)$/.test(file)) assets.push("/emojis/" + file);
 const hash = createHash("sha256")
   .update(assets.map((file) => fs.readFileSync(path.join(root, file))).join(""))
   .digest("hex")

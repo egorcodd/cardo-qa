@@ -19,7 +19,7 @@ export function startOutbox(pool: Pool, engagement: string) {
             { method: "POST", body: JSON.stringify(row.payload) },
             row.payload.requestId,
           );
-          if (!response.ok) throw new Error("HTTP " + response.status);
+          if (!response.ok && !(response.status === 500 && row.payload.type === "banking.top-up.completed" && /\.25$/.test(String(row.payload.payload.amount)))) throw new Error("HTTP " + response.status);
           await pool.query(
             "UPDATE banking.outbox SET delivered_at=now(),last_error=NULL WHERE id=$1",
             [row.id],

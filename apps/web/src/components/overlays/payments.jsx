@@ -28,7 +28,7 @@ export function Receive({ card, onClose, notify }) {
   async function copy(label, value) {
     try {
       await navigator.clipboard.writeText(value);
-      notify(label + " " + t("toast.copiedSuffix"));
+      notify(label + " " + t("toast.copiedSuffix"), "copy");
     } catch {
       notify("Не удалось скопировать", "close");
     }

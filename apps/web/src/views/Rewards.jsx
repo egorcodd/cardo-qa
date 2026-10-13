@@ -2,14 +2,17 @@ import { useState, useEffect, useRef } from "react";
 import { api } from "../api.js";
 import { useLang } from "../i18n.jsx";
 import Icon from "../icons.jsx";
-import { Coins, Crown } from "lucide-react";
 import Dialog from "../components/Dialog.jsx";
+import RewardConfetti from "../components/RewardConfetti.jsx";
 function RewardSymbol({ id, size = 24 }) {
   if (id === "plus")
-    return <Crown size={size} strokeWidth={1.8} aria-hidden="true" />;
-  if (id === "cashback")
-    return <Coins size={size} strokeWidth={1.8} aria-hidden="true" />;
-  return <Icon name={id === "travel" ? "plane" : "gift"} size={size} />;
+    return <Icon name="party" size={size + 2} />;
+  return (
+    <Icon
+      name={id === "cashback" ? "cashback" : id === "travel" ? "travel" : "gift"}
+      size={size + 4}
+    />
+  );
 }
 export function Rewards({ notify, onRefresh, membership }) {
   const { lang } = useLang(),
@@ -25,7 +28,8 @@ export function Rewards({ notify, onRefresh, membership }) {
     [error, setError] = useState(""),
     [pending, setPending] = useState(false),
     [selected, setSelected] = useState(null),
-    [claimed, setClaimed] = useState(false);
+    [claimed, setClaimed] = useState(false),
+    [celebration, setCelebration] = useState(0);
   async function load() {
     try {
       const value = await api.rewards();
@@ -53,6 +57,7 @@ export function Rewards({ notify, onRefresh, membership }) {
         items: d.items,
       }));
       setClaimed(true);
+      setCelebration((value) => value + 1);
       notify(w("Награда получена", "Reward received"), "gift");
     } catch (e) {
       if (alive.current) notify(e.message, "close");
@@ -67,6 +72,7 @@ export function Rewards({ notify, onRefresh, membership }) {
     : "";
   return (
     <div className="design-page anim">
+      {celebration > 0 && <RewardConfetti key={celebration} />}
       <h1 className="send-h">{w("Награды", "Rewards")}</h1>
       {error ? (
         <section className="card-soft">
@@ -81,11 +87,11 @@ export function Rewards({ notify, onRefresh, membership }) {
         <>
           <section className="rewards-wallet">
             <span className="reward-wallet-symbol" aria-hidden="true">
-              <Coins size={42} strokeWidth={1.6} />
+              <Icon name="rewards" size={46} />
             </span>
             <span className="badge-lime">
               {membership?.premium && (
-                <Crown size={14} strokeWidth={1.8} aria-hidden="true" />
+                <Icon name="party" size={18} />
               )}
               {membership?.premium
                 ? w("Cardo Плюс", "Cardo Plus")

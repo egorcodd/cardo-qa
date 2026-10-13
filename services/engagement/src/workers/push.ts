@@ -1,4 +1,5 @@
 import webpush from "web-push";
+import { pushContent } from "../content/push-content.ts";
 import type { Pool } from "pg";
 import { transaction } from "../../../../packages/shared/db.ts";
 import { startWorker } from "../../../../packages/shared/worker.ts";
@@ -34,17 +35,9 @@ export async function deliverPendingPush(
         return;
       }
       try {
-        const title = data.language === "en" ? ({
-          transfer: "Transfer complete",
-          transfer_incoming: "Money received",
-          top_up: "Account topped up",
-          reward: "Reward received",
-          reminder: "Reminder",
-          test: "Cardo notification",
-        } as Record<string, string>)[data.kind] || data.title : data.title;
+        const content = pushContent(data.kind, data.title, data.body, data.language);
         await sendNotification(data.payload, JSON.stringify({
-          title,
-          body: data.body,
+          ...content,
           url: data.url,
           tag: d.notification_id,
           notificationId: d.notification_id,

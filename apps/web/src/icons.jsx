@@ -18,7 +18,6 @@ import {
   UserRound,
   QrCode,
   CreditCard,
-  Snowflake,
   Settings,
   LogOut,
   Copy,
@@ -68,7 +67,6 @@ const icons = {
   card: CreditCard,
   income: ArrowDownLeft,
   expense: ArrowUpRight,
-  freeze: Snowflake,
   settings: Settings,
   exit: LogOut,
   copy: Copy,
@@ -95,7 +93,33 @@ const icons = {
   bank: Landmark,
   calendar: CalendarDays,
 };
+const emojiIcons = {
+  freeze: "cold",
+  party: "party",
+  cashback: "cashback",
+  travel: "travel",
+  rewards: "rewards",
+  "toast-success": "success",
+  "toast-error": "error",
+  "toast-copy": "copy",
+  "toast-bell": "bell",
+  "toast-unfreeze": "sun",
+};
 export default function Icon({ name, size = 20, strokeWidth = 1.8, ...rest }) {
+  const emoji = emojiIcons[name];
+  if (emoji)
+    return (
+      <img
+        {...rest}
+        src={"/emojis/" + emoji + ".png"}
+        width={size}
+        height={size}
+        className={"emoji-icon" + (rest.className ? " " + rest.className : "")}
+        alt=""
+        aria-hidden="true"
+        draggable="false"
+      />
+    );
   const Component = icons[name] || Circle;
   return (
     <Component

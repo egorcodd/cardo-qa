@@ -9,6 +9,11 @@ import { registerProxy } from "./proxy.ts";
 import type { ServiceUrls } from "./dependencies.ts";
 export function createGatewayApp(urls: ServiceUrls, dist: string) {
   const app = service("gateway");
+  app.use((_req, res, next) => {
+    res.set("X-Robots-Tag", "noindex, nofollow");
+    next();
+  });
+  app.get("/sitemap.xml", (_req, res) => res.sendStatus(404));
   app.set("trust proxy", process.env.TRUST_PROXY === "1" ? 1 : false);
   app.get(
     "/health",

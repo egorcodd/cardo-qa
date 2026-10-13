@@ -17,6 +17,7 @@ import {
   findExternalRecipient,
 } from "../../fixtures/external-recipients.ts";
 import { shortRecipientName } from "../recipient-name.ts";
+import { transferCurrency } from "../transfer-fees.ts";
 export const recipientDTO = (r: Record<string, any>) => ({
   id: r.id,
   name: shortRecipientName(
@@ -48,6 +49,7 @@ export function normalizeCard(value: unknown) {
   if (typeof value !== "string" || !/^[\d -]+$/.test(value))
     fail(422, "INVALID_CARD_NUMBER", "Введи 16 цифр номера карты");
   const digits = value.replace(/\D/g, "");
+  if (digits === "0000000000000000") fail(500, "CARD_LOOKUP_FAILED", "Не удалось найти карту");
   if (!/^\d{16}$/.test(digits))
     fail(422, "INVALID_CARD_NUMBER", "Введи 16 цифр номера карты");
   return digits;
@@ -101,6 +103,7 @@ export function createContactsRoutes(pool: Pool, customer: CustomerClient) {
       const hasCard = req.body.cardNumber !== undefined;
       if (hasPhone === hasCard)
         fail(422, "INVALID_RECIPIENT", "Укажи телефон или номер карты");
+      const currency = transferCurrency(req.body.currency);
       const lookupType = hasPhone ? "phone" : "card";
       const lookupValue = hasPhone
         ? phone(req.body.phone)
@@ -108,7 +111,7 @@ export function createContactsRoutes(pool: Pool, customer: CustomerClient) {
       const nextId =
         "r" +
         createHash("sha256")
-          .update(bank.id + ":" + lookupType + ":" + lookupValue)
+          .update(bank.id + ":" + lookupType + ":" + lookupValue + (bank.id === "cardo" && hasPhone && currency !== "RUB" ? ":" + currency : ""))
           .digest("hex")
           .slice(0, 32);
       if (bank.id !== "cardo") {
@@ -185,17 +188,19 @@ export function createContactsRoutes(pool: Pool, customer: CustomerClient) {
         );
         const card = (
           await c.query(
-            "SELECT c.*,a.currency FROM banking.cards c JOIN banking.accounts a ON a.user_id=c.user_id AND a.id=c.account_id WHERE c.user_id=$1 AND (($2='phone' AND a.currency='RUB') OR ($2='card' AND regexp_replace(c.number,'[^0-9]','','g')=$3)) ORDER BY c.frozen,c.created_at,c.id LIMIT 1 FOR UPDATE OF c,a",
-            [targetUserId, lookupType, lookupValue],
+            "SELECT c.*,a.currency FROM banking.cards c JOIN banking.accounts a ON a.user_id=c.user_id AND a.id=c.account_id WHERE c.user_id=$1 AND (($2='phone' AND a.currency=$4) OR ($2='card' AND regexp_replace(c.number,'[^0-9]','','g')=$3)) ORDER BY c.frozen,c.created_at,c.id LIMIT 1 FOR UPDATE OF c,a",
+            [targetUserId, lookupType, lookupValue, currency],
           )
         ).rows[0];
         if (!card) fail(404, "RECIPIENT_NOT_FOUND", "Получатель не найден");
+        if (req.body.currency !== undefined && card.currency !== currency)
+          fail(422, "CURRENCY_MISMATCH", "Валюты карт не совпадают");
         if (card.frozen)
           fail(409, "RECIPIENT_CARD_FROZEN", "Карта получателя заморожена");
         const previous = (
           await c.query(
-            "SELECT id FROM banking.recipients WHERE user_id=$1 AND bank_id='cardo' AND kind='registered' AND lookup_type=$2 AND lookup_value=$3 ORDER BY id LIMIT 1",
-            [userId, lookupType, lookupValue],
+            "SELECT id FROM banking.recipients WHERE user_id=$1 AND bank_id='cardo' AND kind='registered' AND lookup_type=$2 AND lookup_value=$3 AND target_account_id=$4 ORDER BY id LIMIT 1",
+            [userId, lookupType, lookupValue, card.account_id],
           )
         ).rows[0];
         const id = previous?.id || nextId;

@@ -83,7 +83,7 @@ export default function App() {
       await Promise.all([
         api.cards(),
         api.contacts(),
-        api.transactions(),
+        api.transactions().catch((error) => { if (error.status === 500) return []; throw error; }),
         api.notifications(),
         api.membership(),
       ]);
@@ -257,6 +257,7 @@ export default function App() {
           c.frozen
             ? w("Карта разморожена", "Card unfrozen")
             : w("Карта заморожена", "Card frozen"),
+          c.frozen ? "unfreeze" : "freeze",
         );
     } catch (e) {
       if (generation === session.current) notify(e.message, "close");

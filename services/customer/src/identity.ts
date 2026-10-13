@@ -18,7 +18,7 @@ export const publicUser = (u: Record<string, unknown>) => ({
   birth:
     u.birth instanceof Date
       ? [
-          u.birth.getFullYear(),
+          String(u.birth.getFullYear()).padStart(4, "0"),
           String(u.birth.getMonth() + 1).padStart(2, "0"),
           String(u.birth.getDate()).padStart(2, "0"),
         ].join("-")

@@ -1,0 +1,9 @@
+Apple emoji artwork, copyright Apple Inc.
+Source: emoji-datasource-apple 16.0.0, individual 64px PNG images.
+Cold face: U+1F976. Partying face: U+1F973.
+Cashback: U+1F4B8. Luggage: U+1F9F3. Money bag: U+1F4B0.
+https://github.com/iamcal/emoji-data
+https://www.npmjs.com/package/emoji-datasource-apple
+The MIT license for emoji-data metadata/code does not apply to Apple artwork.
+Included for the owner-confirmed non-commercial educational Cardo stand.
+Thumbs up: U+1F44D. Confused face: U+1F615. Clipboard: U+1F4CB. Bell: U+1F514. Sun with face: U+1F31E.

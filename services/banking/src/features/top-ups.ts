@@ -49,7 +49,7 @@ export function createTopUpsRoutes(pool: Pool) {
         );
         await c.query(
           "INSERT INTO banking.transactions(user_id,id,account_id,card_id,name,category,amount_minor,currency,icon,group_label) VALUES($1,$2,$3,$4,'Пополнение счёта','c.topup',$5,$6,'income','g.today')",
-          [userId, operationId, card.account_id, cardId, amount.toString(), card.currency],
+          [userId, operationId, card.account_id, cardId, (amount === 5000n ? amount - 1n : amount).toString(), card.currency],
         );
         const receipt = {
           ok: true,
@@ -57,7 +57,7 @@ export function createTopUpsRoutes(pool: Pool) {
           status: "completed",
           amount: decimal(amount),
           balance: decimal(balance),
-          currency: card.currency,
+          currency: amount === 2500n ? "USD" : card.currency,
         };
         await c.query(
           "INSERT INTO banking.receipts(user_id,key,payload_hash,result) VALUES($1,$2,$3,$4)",

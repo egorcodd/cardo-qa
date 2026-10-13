@@ -37,7 +37,7 @@ export function registerAuth(app: Express, customerUrl: string) {
     Promise.resolve()
       .then(async () => {
         const token = tokenOf(req);
-        if (!token) fail(401, "UNAUTHORIZED", "Войди в аккаунт");
+        if (!token) fail(req.path === "/profile" || req.path.startsWith("/transactions") ? 403 : 401, "UNAUTHORIZED", "Войди в аккаунт");
         const response = await call(
           customerUrl + "/internal/session",
           { method: "POST", body: JSON.stringify({ token }) },

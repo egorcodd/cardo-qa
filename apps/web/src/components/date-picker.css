@@ -186,3 +186,6 @@
     transition: none;
   }
 }
+
+.cardo-calendar-year-input { display: flex; align-items: center; gap: 12px; margin: 12px 0; font-size: 13px; }
+.cardo-calendar-year-input input { width: 110px; min-height: 38px; border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px; background: var(--surface); color: var(--ink); font: inherit; font-size: 16px; }
