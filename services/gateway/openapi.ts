@@ -1,6 +1,13 @@
 import { externalBanks } from "../../packages/contracts/index.ts";
+import { describeOperation, schemas } from "./src/docs/contracts.ts";
 const paths: Record<string, unknown> = {};
+const tagNames = ["auth", "profile", "cards", "banks", "recipients", "transfer", "exchange", "transactions", "limits", "rates", "rewards", "notifications", "push", "system"];
+function tagFor(path: string) {
+  const group = path.split("/")[1];
+  return ({ settings: "profile", "profile-stats": "profile", contacts: "recipients", "top-ups": "cards", membership: "rewards", reminders: "notifications", health: "system" } as Record<string, string>)[group] || group;
+}
 const routes = [
+  ["get", "/health", "Доступность публичного API"],
   [
     "post",
     "/auth/register",
@@ -55,7 +62,7 @@ const routes = [
     "Сохранить настройки",
     { language: "ru", hideBalance: false, mainCardId: "k1" },
   ],
-  ["get", "/cards", "Мои карты"],
+  ["get", "/cards", "Список карт"],
   ["get", "/cards/{id}/requisites", "Реквизиты"],
   [
     "post",
@@ -64,8 +71,6 @@ const routes = [
     { frozen: true },
   ],
   ["get", "/banks", "Банки получателя"],
-  ["put", "/banks/{bankId}/favorite", "Добавить банк в избранное"],
-  ["delete", "/banks/{bankId}/favorite", "Убрать банк из избранного"],
   ["get", "/contacts", "Получатели"],
   ["get", "/recipients/examples", "Вымышленные получатели внешнего банка"],
   [
@@ -75,8 +80,8 @@ const routes = [
     { phone: "+79990001002", bankId: "cardo" },
   ],
   ["post", "/top-ups", "Пополнить счёт", { cardId: "k1", amount: "5000.00" }],
-  ["get", "/transactions", "История"],
-  ["get", "/transactions/{id}", "Моя операция"],
+  ["get", "/transactions", "История операций"],
+  ["get", "/transactions/{id}", "Детали операции"],
   ["get", "/limits", "Лимиты"],
   ["put", "/limits", "Сохранить лимиты", { transfer: 150000, single: 300000 }],
   ["get", "/transfer/fee", "Комиссия по текущему тарифу"],
@@ -90,7 +95,7 @@ const routes = [
       amount: "100.50",
     },
   ],
-  ["get", "/rates", "Курсы Cardo из сервиса Rates"],
+  ["get", "/rates", "Курсы валют"],
   ["get", "/rewards", "Награды"],
   ["get", "/membership", "Статус Cardo Плюс"],
   ["get", "/notifications/preferences", "Настройки уведомлений"],
@@ -107,14 +112,14 @@ const routes = [
     "Создать напоминание",
     {
       message: "Проверить перевод",
-      scheduledAt: "2026-12-01T10:00:00Z",
+      scheduledAt: new Date(Date.now() + 86400000).toISOString(),
       idempotencyKey: "replace-with-a-new-uuid",
     },
   ],
   ["delete", "/reminders/{id}", "Отменить напоминание"],
   ["post", "/rewards/{id}/claim", "Получить награду", {}],
   ["get", "/notifications", "Уведомления"],
-  ["patch", "/notifications/{id}/read", "Прочитать", {}],
+  ["patch", "/notifications/{id}/read", "Отметить уведомление прочитанным", {}],
   ["post", "/notifications/test", "Проверить уведомления", {}],
   ["get", "/push/config", "Открытый VAPID ключ"],
   [
@@ -138,7 +143,7 @@ const routes = [
 for (const [method, path, summary, body] of routes) {
   const item: Record<string, unknown> = {
     summary,
-    tags: [path.split("/")[1]],
+    tags: [tagFor(path)],
     responses: {
       "200": { description: "Успешный ответ" },
       "201": { description: "Создано" },
@@ -161,7 +166,7 @@ for (const [method, path, summary, body] of routes) {
         }
       : {}),
   };
-  if (body)
+  if (body && Object.keys(body).length)
     item.requestBody = {
       required: true,
       content: {
@@ -170,7 +175,7 @@ for (const [method, path, summary, body] of routes) {
     };
   if (path === "/banks") {
     item.description =
-      "Каталог банков с избранным текущего аккаунта. При первом создании аккаунта Cardo добавлен в избранное. Его можно удалить, изменения сохраняются. Порядок каталога постоянный, favorite отражает личный выбор. Настоящие межбанковские платежи не выполняются.";
+      "Каталог банков получателя.";
     item.responses = {
       "200": {
         description: "Банки получателя",
@@ -180,22 +185,18 @@ for (const [method, path, summary, body] of routes) {
               type: "array",
               items: {
                 type: "object",
-                required: ["id", "name", "favorite"],
+                required: ["id", "name"],
                 properties: {
                   id: {
                     type: "string",
                     enum: ["cardo", ...externalBanks.map((bank) => bank.id)],
                   },
                   name: { type: "string" },
-                  favorite: {
-                    type: "boolean",
-                    description: "Банк в избранном текущего аккаунта",
-                  },
                 },
               },
             },
             example: [
-              { id: "cardo", name: "Cardo", favorite: true },
+              { id: "cardo", name: "Cardo" },
               ...externalBanks,
             ],
           },
@@ -204,50 +205,9 @@ for (const [method, path, summary, body] of routes) {
       "401": { description: "Нужен вход" },
     };
   }
-  if (path === "/banks/{bankId}/favorite") {
-    item.description =
-      "Сохраняет избранное только для текущего аккаунта. Повтор запроса безопасен. Ответ содержит полный каталог с актуальным избранным. Тело запроса не требуется.";
-    item.parameters = [
-      {
-        in: "path",
-        name: "bankId",
-        required: true,
-        schema: {
-          type: "string",
-          enum: ["cardo", ...externalBanks.map((bank) => bank.id)],
-        },
-      },
-    ];
-    item.responses = {
-      "200": {
-        description: "Обновлённый каталог банков",
-        content: {
-          "application/json": {
-            schema: {
-              type: "array",
-              items: {
-                type: "object",
-                required: ["id", "name", "favorite"],
-                properties: {
-                  id: {
-                    type: "string",
-                    enum: ["cardo", ...externalBanks.map((bank) => bank.id)],
-                  },
-                  name: { type: "string" },
-                  favorite: { type: "boolean" },
-                },
-              },
-            },
-          },
-        },
-      },
-      "401": { description: "Нужен вход" },
-      "422": { description: "Неизвестный банк" },
-    };
-  }
   if (path === "/recipients/resolve") {
     item.description =
-      "Для Cardo ищет зарегистрированного клиента. Для другого банка проверяет номер по каталогу вымышленных получателей. Неизвестный номер возвращает 404 и не создаёт контакт. Имя возвращается с первой буквой фамилии. bankId по умолчанию cardo; реальные банковские API не вызываются.";
+      "Поиск по телефону или номеру карты. Для внешнего банка используется каталог вымышленных получателей.";
     const bankId = {
       type: "string",
       enum: ["cardo", ...externalBanks.map((bank) => bank.id)],
@@ -305,7 +265,7 @@ for (const [method, path, summary, body] of routes) {
   }
   if (path === "/recipients/examples") {
     item.description =
-      "Номера вымышленных получателей для проверки имитации внешнего перевода. Для Cardo список пуст: ищи свой зарегистрированный аккаунт. По умолчанию bankId=cardo.";
+      "Вымышленные получатели выбранного внешнего банка. Для Cardo возвращается пустой список.";
     item.parameters = [
       {
         in: "query",
@@ -322,9 +282,6 @@ for (const [method, path, summary, body] of routes) {
     item.parameters = [{ in: "query", name: "currency", schema: { type: "string", enum: ["RUB", "USD", "EUR"], default: "RUB" } }];
     item.description = "Комиссия в валюте перевода. Стандарт: 500 RUB, 5 USD или 5 EUR; Плюс: 100 RUB, 1 USD или 1 EUR.";
   }
-  if (path === "/transfer")
-    item.description =
-      "В Cardo атомарно списывает и зачисляет двум клиентам между счетами одной валюты: RUB, USD или EUR. Комиссия списывается отдельно в валюте перевода. Для внешнего банка имитирует рублёвый перевод: списание, история и уведомление только отправителю. Банк определяется сохранённым recipientId; чужие счета Cardo не зачисляются.";
   if (["/exchange", "/transfer", "/top-ups"].includes(path))
     item.parameters = [
       {
@@ -338,8 +295,8 @@ for (const [method, path, summary, body] of routes) {
         },
         description:
           path === "/exchange"
-            ? "Новый ключ с префиксом ex-. При повторе того же обмена используй прежний ключ."
-            : "Новый ключ операции. Для повторного запроса с теми же данными используй прежний ключ.",
+            ? "Ключ операции с префиксом ex-. Повтор с теми же данными не создаёт новую операцию."
+            : "Ключ операции. Повтор с теми же данными не создаёт новую операцию.",
       },
     ];
   if (path === "/transactions")
@@ -355,6 +312,8 @@ for (const [method, path, summary, body] of routes) {
         schema: { type: "string", enum: ["RUB", "USD", "EUR"] },
       },
     ];
+  describeOperation(method, path, item);
+  if (path === "/health") item.security = [];
   paths[path] = { ...((paths[path] as object) || {}), [method]: item };
 }
 export default {
@@ -362,12 +321,12 @@ export default {
   info: {
     title: "Cardo API",
     version: "2.0.0",
-    description:
-      "Банковский стенд для QA. Новый аккаунт начинает с нуля. Пополни счёт и выбери банк получателя. Переводы клиентам Cardo зачисляются на их счета, другие банки используются для имитации переводов с записью в историю. В Postman используй Bearer token из ответа регистрации/входа. SMS нет. Данные сохраняются в PostgreSQL.",
   },
   servers: [{ url: "/api" }],
+  tags: tagNames.map((name) => ({ name })),
   security: [{ cookieAuth: [] }, { bearerAuth: [] }],
   components: {
+    schemas,
     securitySchemes: {
       cookieAuth: { type: "apiKey", in: "cookie", name: "cardo_session" },
       bearerAuth: { type: "http", scheme: "bearer" },

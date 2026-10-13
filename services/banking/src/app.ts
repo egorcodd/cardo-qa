@@ -73,7 +73,7 @@ export function createBankingApp(
       .catch(next);
   });
   app.use(createCardsRoutes(pool));
-  app.use(createBanksRoutes(pool));
+  app.use(createBanksRoutes());
   app.use(createContactsRoutes(pool, customer));
   app.use(createHistoryRoutes(pool));
   app.use(createLimitsRoutes(pool));

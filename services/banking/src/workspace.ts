@@ -14,10 +14,6 @@ export async function seed(
       [userId, demo],
     );
     if (!inserted.rowCount) return false;
-    await c.query(
-      "INSERT INTO banking.bank_favorites(user_id,bank_id) VALUES($1,'cardo')",
-      [userId],
-    );
     const rows = demo
       ? INIT_TX.filter((t) => !["t10b", "t48", "t49"].includes(t.id)).map(
           (t) => ({

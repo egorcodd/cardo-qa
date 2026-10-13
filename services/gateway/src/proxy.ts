@@ -65,10 +65,7 @@ export function registerProxy(app: Express, urls: ServiceUrls) {
       if (group === "banks") {
         const isCatalog =
           req.path === "/banks" && ["GET", "HEAD"].includes(req.method);
-        const isFavorite =
-          /^\/banks\/[a-z][a-z0-9-]{0,39}\/favorite$/.test(req.path) &&
-          ["PUT", "DELETE"].includes(req.method);
-        if (!isCatalog && !isFavorite) fail(404, "NOT_FOUND", "Не найдено");
+        if (!isCatalog) fail(404, "NOT_FOUND", "Не найдено");
       }
       const headers = {
         "X-User-Id": user.id,

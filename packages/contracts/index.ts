@@ -1,15 +1,15 @@
 export const externalBanks = [
-  { id: "tbank", name: "Т-Банк", favorite: false },
-  { id: "vtb", name: "ВТБ", favorite: false },
-  { id: "tochka", name: "Точка", favorite: false },
-  { id: "revolut", name: "Revolut", favorite: false },
-  { id: "wise", name: "Wise", favorite: false },
-  { id: "sber", name: "Сбер", favorite: false },
-  { id: "alfa", name: "Альфа-Банк", favorite: false },
-  { id: "gazprombank", name: "Газпромбанк", favorite: false },
-  { id: "raiffeisen", name: "Райффайзенбанк", favorite: false },
-  { id: "sovcombank", name: "Совкомбанк", favorite: false },
-  { id: "ozon", name: "Ozon Банк", favorite: false },
+  { id: "tbank", name: "Т-Банк" },
+  { id: "vtb", name: "ВТБ" },
+  { id: "tochka", name: "Точка" },
+  { id: "revolut", name: "Revolut" },
+  { id: "wise", name: "Wise" },
+  { id: "sber", name: "Сбер" },
+  { id: "alfa", name: "Альфа-Банк" },
+  { id: "gazprombank", name: "Газпромбанк" },
+  { id: "raiffeisen", name: "Райффайзенбанк" },
+  { id: "sovcombank", name: "Совкомбанк" },
+  { id: "ozon", name: "Ozon Банк" },
 ] as const;
 export type ExternalBankId = (typeof externalBanks)[number]["id"];
 export const currencies = ["RUB", "USD", "EUR"] as const;

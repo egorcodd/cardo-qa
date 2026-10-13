@@ -71,11 +71,7 @@ test("Bank catalog only accepts known IDs and masks phone/card references", () =
     ],
   );
   assert.equal(resolveBank().id, "cardo");
-  assert.deepEqual(
-    banks.filter((bank) => bank.favorite).map((bank) => bank.id),
-    ["cardo"],
-  );
-  for (const bank of banks) assert.equal(typeof bank.favorite, "boolean");
+  for (const bank of banks) assert.deepEqual(Object.keys(bank).sort(), ["id", "name"]);
   assert.equal(resolveBank("tbank").name, "Т-Банк");
   for (const value of [null, "unknown", "__proto__", {}, 1])
     assert.throws(
@@ -142,11 +138,11 @@ test("External directory requires the selected bank and shortens only display na
   assert.equal(shortRecipientName("Егор"), "Егор");
   assert.equal(shortRecipientName("  Мария   Волкова  "), "Мария В.");
 });
-test("OpenAPI includes every bank and the default favorite metadata", () => {
+test("OpenAPI includes every bank with its catalog fields", () => {
   const catalog =
     openapi.paths["/banks"].get.responses["200"].content["application/json"];
   assert.deepEqual(catalog.example, banks);
-  assert.deepEqual(catalog.schema.items.required, ["id", "name", "favorite"]);
+  assert.deepEqual(catalog.schema.items.required, ["id", "name"]);
   assert.deepEqual(
     catalog.schema.items.properties.id.enum,
     banks.map((bank) => bank.id),

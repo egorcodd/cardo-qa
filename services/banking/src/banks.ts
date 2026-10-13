@@ -1,7 +1,7 @@
 import { externalBanks } from "../../../packages/contracts/index.ts";
 import { fail } from "../../../packages/shared/http.ts";
 export const banks = [
-  { id: "cardo", name: "Cardo", favorite: true },
+  { id: "cardo", name: "Cardo" },
   ...externalBanks,
 ] as const;
 export function resolveBank(value: unknown = "cardo") {

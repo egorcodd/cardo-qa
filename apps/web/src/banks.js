@@ -1,5 +1,5 @@
 export const BANKS = [
-  { id: "cardo", name: "Cardo", favorite: true },
+  { id: "cardo", name: "Cardo" },
   { id: "tbank", name: "Т-Банк" },
   { id: "vtb", name: "ВТБ" },
   { id: "tochka", name: "Точка" },

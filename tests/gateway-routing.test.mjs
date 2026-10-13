@@ -138,16 +138,6 @@ test("Gateway preserves public routes and cannot proxy to internal endpoints", a
         assert.equal(call.trusted, true);
         assert.equal(call.method, "GET");
       }
-      for (const method of ["PUT", "DELETE"]) {
-        const path = "/api/banks/sber/favorite";
-        const response = await request(path, method, { userId: randomUUID() });
-        assert.equal(response.status, 200);
-        assert.equal(response.data.path, path);
-        assert.equal(calls.at(-1).path, path);
-        assert.equal(calls.at(-1).method, method);
-        assert.equal(calls.at(-1).userId, user.id);
-        assert.equal(calls.at(-1).trusted, true);
-      }
       const payload = { cardId: "k1", amount: "123.45" };
       assert.equal(
         (await request("/api/top-ups", "POST", payload)).status,
@@ -158,7 +148,7 @@ test("Gateway preserves public routes and cannot proxy to internal endpoints", a
     },
   );
   await t.test(
-    "bank favorites require authentication and exact public routes",
+    "bank catalog requires authentication and removed mutations never reach banking",
     async () => {
       let count = calls.length;
       const unauthenticated = await fetch(
@@ -169,6 +159,9 @@ test("Gateway preserves public routes and cannot proxy to internal endpoints", a
       assert.equal(calls.length, count);
       for (const [path, method] of [
         ["/api/banks/sber/favorite", "POST"],
+        ["/api/banks/sber/favorite", "PUT"],
+        ["/api/banks/sber/favorite", "DELETE"],
+        ["/api/banks/sber/favorite", "GET"],
         ["/api/banks/sber/favorite/extra", "PUT"],
         ["/api/banks", "DELETE"],
         ["/api/banks/%2e%2e/internal/provision", "POST"],

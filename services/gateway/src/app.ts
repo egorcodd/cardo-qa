@@ -3,6 +3,7 @@ import swaggerUi from "swagger-ui-express";
 import path from "node:path";
 import { service, route, errors } from "../../../packages/shared/http.ts";
 import openapi from "../openapi.ts";
+import { swaggerUiOptions } from "./docs/swagger-ui.ts";
 import { applySecurity } from "./security.ts";
 import { registerAuth } from "./auth.ts";
 import { registerProxy } from "./proxy.ts";
@@ -43,7 +44,7 @@ export function createGatewayApp(urls: ServiceUrls, dist: string) {
   app.use(
     "/api/docs",
     swaggerUi.serve,
-    swaggerUi.setup(openapi, { customSiteTitle: "Cardo API" }),
+    swaggerUi.setup(null, swaggerUiOptions),
   );
   applySecurity(app);
   registerAuth(app, urls.customer);
