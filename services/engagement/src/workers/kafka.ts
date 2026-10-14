@@ -1,5 +1,5 @@
 import { setTimeout as delay } from "node:timers/promises";
-import { kafkaClient, topics } from "../../../../packages/shared/kafka.ts";
+import { kafkaClient, topics, bankingTopics } from "../../../../packages/shared/kafka.ts";
 import { HttpError } from "../../../../packages/shared/http.ts";
 import { events, eventType } from "../../../../packages/shared/metrics.ts";
 import { log, publicEvent } from "../../../../packages/shared/telemetry.ts";
@@ -12,7 +12,7 @@ export async function startEventConsumer(pool: Pool) {
   const producer = kafka.producer({ allowAutoTopicCreation: false });
   await producer.connect();
   await consumer.connect();
-  await consumer.subscribe({ topic: topics.banking, fromBeginning: true });
+  await consumer.subscribe({ topics: bankingTopics, fromBeginning: true });
   await consumer.run({ autoCommit: true, autoCommitInterval: 1000, autoCommitThreshold: 1, eachMessage: async ({ topic, partition, message, heartbeat }) => {
     let event: Record<string, unknown>;
     try {

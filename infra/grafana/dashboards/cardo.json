@@ -180,7 +180,7 @@
         {
           "refId": "A",
           "expr": "cardo_kafka_consumer_lag",
-          "legendFormat": "{{group}} / {{partition}}"
+          "legendFormat": "{{group}} / {{topic}} / {{partition}}"
         }
       ],
       "fieldConfig": {

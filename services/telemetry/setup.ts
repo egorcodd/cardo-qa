@@ -21,10 +21,13 @@ if (process.argv[2] === "elastic") {
   await es("/_security/user/student", "PUT", { password: required("TOOLS_STUDENT_PASSWORD"), roles: ["cardo_reader"] });
   await es("/_ilm/policy/cardo-logs", "PUT", { policy: { phases: { hot: { actions: { rollover: { max_primary_shard_size: "256mb", max_age: "1d" } } }, delete: { min_age: "3d", actions: { delete: {} } } } } });
   const properties: Record<string, unknown> = { "@timestamp": { type: "date" } };
-  for (const field of ["service", "level", "message", "requestId", "eventId", "operationId", "topic", "group", "errorCode", "offset", "currency", "method", "type", "route", "amount"]) properties[field] = { type: "keyword", ignore_above: 200 };
+  for (const field of ["service", "level", "message", "requestId", "eventId", "causationId", "notificationId", "operationId", "topic", "group", "errorCode", "offset", "currency", "method", "type", "route", "amount", "kind", "category"]) properties[field] = { type: "keyword", ignore_above: 200 };
   for (const field of ["status", "durationMs", "partition", "attempt"]) properties[field] = { type: "long" };
   await es("/_index_template/cardo-logs", "PUT", { index_patterns: ["cardo-logs-*"], template: { settings: { number_of_shards: 1, number_of_replicas: 0, "index.lifecycle.name": "cardo-logs", "index.lifecycle.rollover_alias": "cardo-logs" }, mappings: { dynamic: "strict", properties } } });
   await es("/cardo-logs-000001", "PUT", { aliases: { "cardo-logs": { is_write_index: true } } }, [400]);
+  // The template governs future indices; existing strict indices need the same
+  // additive fields before producers start sending notification correlations.
+  await es("/cardo-logs-*/_mapping", "PUT", { properties: Object.fromEntries(["causationId", "notificationId", "kind", "category"].map(field => [field, properties[field]])) });
 } else if (process.argv[2] === "views") {
   const kibana = required("KIBANA_URL");
   await call(kibana, "/api/spaces/space", "POST", { id: "cardo", name: "Cardo", description: "Логи учебного банка Cardo", disabledFeatures: ["dev_tools", "advancedSettings", "stackAlerts", "savedObjectsManagement"] }, "elastic", password, [409]);

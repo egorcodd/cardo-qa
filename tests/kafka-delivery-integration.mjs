@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
-import { kafkaClient, topics } from "../packages/shared/kafka.ts";
+import { kafkaClient, topics, bankingTopics, practiceTopics } from "../packages/shared/kafka.ts";
 
 const enabled = process.env.CARDO_KAFKA_INTEGRATION === "1";
 test("processing a transactional event commits both data and trailing control records", { skip: !enabled, timeout: 90000 }, async () => {
@@ -29,7 +29,7 @@ test("processing a transactional event commits both data and trailing control re
     let caughtUp = false;
     for (let attempt = 0; attempt < 30; attempt++) {
       const checks = [];
-      for (const [groupId, topic] of [["cardo-engagement", topics.banking], ["cardo-practice-audit", topics.practice]]) {
+      for (const [groupId, topic] of [...bankingTopics.map(topic => ["cardo-engagement", topic]), ...practiceTopics.map(topic => ["cardo-practice-audit", topic])]) {
         const end = await admin.fetchTopicOffsets(topic);
         const saved = await admin.fetchOffsets({ groupId, topics: [topic] });
         checks.push(end.every(partition => partition.high === "0" || saved[0].partitions.find(item => item.partition === partition.partition)?.offset === partition.high));

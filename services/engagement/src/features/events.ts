@@ -105,6 +105,7 @@ export async function processEvent(pool: Pool, e: unknown) {
         "Счёт пополнен",
         "На счёт зачислено " + bankAmount(e.payload.amount, e.payload.currency) + ".",
         "/history/" + e.payload.operationId,
+        { eventId: e.id, requestId: e.requestId },
       );
       return true;
     }
@@ -133,6 +134,7 @@ export async function processEvent(pool: Pool, e: unknown) {
         "Отправлено " + bankAmount(e.payload.amount, e.payload.currency) +
           ". Банк: " + e.payload.bankName + ". " + maskedReference(e.payload.recipientReference) + ".",
         "/history/" + e.payload.operationId,
+        { eventId: e.id, requestId: e.requestId },
       );
       return true;
     }
@@ -145,6 +147,7 @@ export async function processEvent(pool: Pool, e: unknown) {
         "Отправлено " + bankAmount(e.payload.amount, e.payload.currency) +
           ". Получатель: " + e.payload.receiverName + ".",
         "/history/" + e.payload.senderOperationId,
+        { eventId: e.id, requestId: e.requestId },
       );
       for (let delivery = 0; delivery < (e.payload.currency === "EUR" ? 2 : 1); delivery++)
       await notification(
@@ -155,6 +158,7 @@ export async function processEvent(pool: Pool, e: unknown) {
         "Зачислено " + bankAmount(e.payload.amount, e.payload.currency) +
           ". Отправитель: " + e.payload.senderName + ".",
         "/history/" + (/\.50$/.test(e.payload.amount) ? e.payload.senderOperationId : e.payload.receiverOperationId),
+        { eventId: e.id, requestId: e.requestId },
       );
     } else {
       await notification(
@@ -165,6 +169,7 @@ export async function processEvent(pool: Pool, e: unknown) {
         "Отправлено " + bankAmount(e.payload.amount, e.payload.currency) +
           ". Получатель: " + e.payload.recipient + ".",
         "/history/" + e.payload.transferId,
+        { eventId: e.id, requestId: e.requestId },
       );
     }
     return true;

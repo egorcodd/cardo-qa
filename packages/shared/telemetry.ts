@@ -8,7 +8,7 @@ export function safeLog(input: Record<string, unknown>): SafeLog | null {
   if (!services.has(String(input.service)) || !messages.has(String(input.message)) || !["info", "warn", "error"].includes(String(input.level))) return null;
   const output: SafeLog = { "@timestamp": new Date().toISOString(), service: String(input.service), level: String(input.level), message: String(input.message) };
   if (typeof input["@timestamp"] === "string" && /^\d{4}-\d{2}-\d{2}T/.test(input["@timestamp"]) && !Number.isNaN(Date.parse(input["@timestamp"]))) output["@timestamp"] = new Date(input["@timestamp"]).toISOString();
-  for (const key of ["requestId", "eventId", "operationId", "topic", "group", "errorCode", "offset", "currency", "method"])
+  for (const key of ["requestId", "eventId", "causationId", "notificationId", "operationId", "topic", "group", "errorCode", "offset", "currency", "method", "kind", "category"])
     if (typeof input[key] === "string" && /^[A-Za-z0-9_.:-]{1,120}$/.test(input[key] as string)) output[key] = input[key] as string;
   if (input.type) output.type = eventType(input.type);
   if (typeof input.route === "string") output.route = routeLabel(input.route);

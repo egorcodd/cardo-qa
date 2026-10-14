@@ -1,7 +1,7 @@
 import { upstream } from "../../../../packages/shared/http.ts";
 import type { Pool } from "pg";
 import { startWorker } from "../../../../packages/shared/worker.ts";
-import { kafkaClient, kafkaEnabled, topics } from "../../../../packages/shared/kafka.ts";
+import { kafkaClient, kafkaEnabled, operationTopics } from "../../../../packages/shared/kafka.ts";
 import { backlog, events, eventType } from "../../../../packages/shared/metrics.ts";
 import { log, publicEvent } from "../../../../packages/shared/telemetry.ts";
 
@@ -17,11 +17,12 @@ export async function startOutbox(pool: Pool, engagement: string) {
         const projection = publicEvent(row.payload);
         try {
           if (producer) {
+            const destination = operationTopics(row.payload.type);
             const transaction = await producer.transaction();
             try {
               await transaction.sendBatch({ topicMessages: [
-                { topic: topics.banking, messages: [{ key: row.user_id, value: JSON.stringify(row.payload) }] },
-                { topic: topics.practice, messages: [{ key: projection.accountRef, value: JSON.stringify(projection) }] },
+                { topic: destination.internal, messages: [{ key: row.user_id, value: JSON.stringify(row.payload) }] },
+                { topic: destination.public, messages: [{ key: projection.accountRef, value: JSON.stringify(projection) }] },
               ] });
               await transaction.commit();
             } catch (error) { await transaction.abort(); throw error; }
@@ -31,7 +32,7 @@ export async function startOutbox(pool: Pool, engagement: string) {
           }
           await pool.query("UPDATE banking.outbox SET delivered_at=now(),last_error=NULL WHERE id=$1", [row.id]);
           events.inc({ service: "banking", type: eventType(row.payload.type), stage: "publish", result: "ok" });
-          log("banking", "info", "event.published", { ...projection, topic: producer ? topics.banking : "http" });
+          log("banking", "info", "event.published", { ...projection, topic: producer ? operationTopics(row.payload.type).internal : "http" });
         } catch {
           await pool.query("UPDATE banking.outbox SET last_error=$2,next_attempt_at=now()+make_interval(secs=>$3) WHERE id=$1", [row.id, "EVENT_DELIVERY_FAILED", Math.min(300, 2 ** Math.min(row.attempts, 8))]);
           events.inc({ service: "banking", type: eventType(row.payload.type), stage: "publish", result: "error" });

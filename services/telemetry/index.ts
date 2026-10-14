@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { service, route, internal, listen, errors } from "../../packages/shared/http.ts";
-import { kafkaClient, topics } from "../../packages/shared/kafka.ts";
+import { kafkaClient, bankingTopics, practiceTopics } from "../../packages/shared/kafka.ts";
 import { lag, telemetryDropped, telemetryQueued } from "../../packages/shared/metrics.ts";
 import { safeLog } from "../../packages/shared/telemetry.ts";
 import type { SafeLog } from "../../packages/shared/telemetry.ts";
@@ -35,13 +35,13 @@ const admin = kafka.admin();
 const consumer = kafka.consumer({ groupId: "cardo-practice-audit", allowAutoTopicCreation: false });
 await admin.connect();
 await consumer.connect();
-await consumer.subscribe({ topic: topics.practice, fromBeginning: true });
+await consumer.subscribe({ topics: practiceTopics, fromBeginning: true });
 await consumer.run({ autoCommitInterval: 1000, autoCommitThreshold: 1, eachMessage: async ({ topic, partition, message }) => {
   const payload = JSON.parse(message.value?.toString() || "{}") as Record<string, unknown>;
   enqueue({ ...payload, level: "info", service: "telemetry", message: "event.observed", topic, partition, offset: message.offset, group: "cardo-practice-audit" });
 } });
 const stopLag = startWorker(async () => {
-  for (const [group, topic] of [["cardo-engagement", topics.banking], ["cardo-practice-audit", topics.practice]]) {
+  for (const [group, topic] of [...bankingTopics.map(topic => ["cardo-engagement", topic]), ...practiceTopics.map(topic => ["cardo-practice-audit", topic])]) {
     const end = await admin.fetchTopicOffsets(topic);
     const offsets = await admin.fetchOffsets({ groupId: group, topics: [topic] });
     for (const partition of end) {

@@ -11,7 +11,7 @@ export const telemetryDropped = new Counter({ name: "cardo_telemetry_dropped_tot
 export const telemetryQueued = new Gauge({ name: "cardo_telemetry_queued", help: "Log records awaiting ingestion", labelNames: ["service"], registers: [registry] });
 
 export function eventType(value: unknown) {
-  return ["banking.transfer.completed", "banking.external-transfer.completed", "banking.top-up.completed"].includes(String(value)) ? String(value) : "unknown";
+  return ["banking.transfer.completed", "banking.external-transfer.completed", "banking.top-up.completed", "engagement.notification.created"].includes(String(value)) ? String(value) : "unknown";
 }
 export function routeLabel(value: string) {
   return value.split("?")[0].split("/").map(part => /^[0-9a-f-]{36}$/i.test(part) || /^(?:tu|tr|ex|ca|ac|r)[0-9a-f-]{16,}$/i.test(part) || /^\d+$/.test(part) ? ":id" : part).slice(0, 5).join("/").slice(0, 160);

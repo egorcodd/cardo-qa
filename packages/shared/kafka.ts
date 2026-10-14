@@ -1,7 +1,22 @@
 import { Kafka, logLevel } from "kafkajs";
 import { log } from "./telemetry.ts";
 
-export const topics = { banking: "cardo.banking.events.v1", practice: "cardo.practice.events.v1", deadLetter: "cardo.practice.dead-letter.v1" };
+export const topics = {
+  legacyBanking: "cardo.banking.events.v1",
+  internalTransfers: "cardo.internal.transfers.v1",
+  internalTopups: "cardo.internal.topups.v1",
+  transfers: "cardo.transfers.v1",
+  topups: "cardo.topups.v1",
+  notifications: "cardo.notifications.v1",
+  deadLetter: "cardo.processing-errors.v1",
+};
+export const bankingTopics = [topics.legacyBanking, topics.internalTransfers, topics.internalTopups];
+export const practiceTopics = [topics.transfers, topics.topups, topics.notifications, topics.deadLetter];
+export function operationTopics(type: unknown) {
+  if (type === "banking.top-up.completed") return { internal: topics.internalTopups, public: topics.topups };
+  if (type === "banking.transfer.completed" || type === "banking.external-transfer.completed") return { internal: topics.internalTransfers, public: topics.transfers };
+  throw new Error("UNKNOWN_OPERATION_EVENT");
+}
 export function kafkaEnabled() { return process.env.EVENT_TRANSPORT === "kafka"; }
 export function kafkaClient(service: string) {
   const brokers = process.env.KAFKA_BROKERS?.split(",").filter(Boolean);
