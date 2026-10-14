@@ -53,7 +53,9 @@ export async function migrate(pool: pg.Pool, file: URL) {
     );
     for (const name of files) {
       const sql = await readFile(path.join(directory, name), "utf8");
-      const checksum = createHash("sha256").update(sql).digest("hex");
+      const normalizedSql = sql.replace(/\r\n/g, "\n");
+      const checksum = createHash("sha256").update(normalizedSql).digest("hex");
+      const legacyChecksum = createHash("sha256").update(normalizedSql.replace(/\n/g, "\r\n")).digest("hex");
       const previous = (
         await c.query(
           "SELECT checksum FROM " + owner + ".schema_migrations WHERE name=$1",
@@ -61,7 +63,7 @@ export async function migrate(pool: pg.Pool, file: URL) {
         )
       ).rows[0];
       if (previous) {
-        if (previous.checksum !== checksum)
+        if (previous.checksum !== checksum && previous.checksum !== legacyChecksum)
           throw new Error("Applied migration changed: " + owner + "/" + name);
         continue;
       }
