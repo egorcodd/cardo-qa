@@ -120,7 +120,7 @@ export default function App() {
         await load(generation);
       })
       .catch((e) => {
-        if (generation === session.current && e.status !== 401)
+        if (generation === session.current && e.status !== 401 && e.code !== "UNAUTHORIZED")
           setLoadErr(e.message);
       })
       .finally(() => {

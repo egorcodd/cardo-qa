@@ -107,3 +107,21 @@ test('successful API calls clear their deadline and preserve the response', asyn
   assert.equal(await api.profile(), profile);
   assert.equal(timers.size, 0);
 });
+
+test('anonymous profile preserves the UNAUTHORIZED 403 response for the login flow', async () => {
+  const { api, timers } = apiWith(async () => ({
+    ok: false, status: 403,
+    json: async () => ({ error: { code: 'UNAUTHORIZED', message: 'Login required' } }),
+  }));
+  await assert.rejects(api.profile(), error => error.status === 403 && error.code === 'UNAUTHORIZED' && !error.network);
+  assert.equal(timers.size, 0);
+});
+
+test('other 403 responses retain their distinct rejection code', async () => {
+  const { api, timers } = apiWith(async () => ({
+    ok: false, status: 403,
+    json: async () => ({ error: { code: 'ORIGIN_REJECTED', message: 'Origin rejected' } }),
+  }));
+  await assert.rejects(api.profile(), error => error.status === 403 && error.code === 'ORIGIN_REJECTED' && !error.network);
+  assert.equal(timers.size, 0);
+});
