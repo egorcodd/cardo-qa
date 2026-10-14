@@ -5,6 +5,22 @@ import { lag, telemetryDropped, telemetryQueued } from "../../packages/shared/me
 import { safeLog } from "../../packages/shared/telemetry.ts";
 import type { SafeLog } from "../../packages/shared/telemetry.ts";
 import { startWorker } from "../../packages/shared/worker.ts";
+import { statfs } from "node:fs/promises";
+import { Gauge } from "@prometheus-io/client";
+import { registry } from "../../packages/shared/metrics.ts";
+
+new Gauge({
+  name: "cardo_storage_available_bytes",
+  help: "Available bytes on the filesystem backing the collector container; not a filesystem quota",
+  registers: [registry],
+  async collect() { const fs = await statfs("/"); this.set(fs.bavail * fs.bsize); },
+});
+new Gauge({
+  name: "cardo_storage_size_bytes",
+  help: "Size of the filesystem backing the collector container",
+  registers: [registry],
+  async collect() { const fs = await statfs("/"); this.set(fs.blocks * fs.bsize); },
+});
 
 const elastic = process.env.ELASTIC_URL;
 const password = process.env.ELASTIC_WRITER_PASSWORD;
@@ -38,7 +54,7 @@ await consumer.connect();
 await consumer.subscribe({ topics: practiceTopics, fromBeginning: true });
 await consumer.run({ autoCommitInterval: 1000, autoCommitThreshold: 1, eachMessage: async ({ topic, partition, message }) => {
   const payload = JSON.parse(message.value?.toString() || "{}") as Record<string, unknown>;
-  enqueue({ ...payload, level: "info", service: "telemetry", message: "event.observed", topic, partition, offset: message.offset, group: "cardo-practice-audit" });
+  enqueue({ ...payload, "@timestamp": payload.occurredAt, level: "info", service: "telemetry", message: "event.observed", topic, partition, offset: message.offset, group: "cardo-practice-audit" });
 } });
 const stopLag = startWorker(async () => {
   for (const [group, topic] of [...bankingTopics.map(topic => ["cardo-engagement", topic]), ...practiceTopics.map(topic => ["cardo-practice-audit", topic])]) {

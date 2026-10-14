@@ -5,7 +5,8 @@ printf 'security.protocol=SASL_PLAINTEXT\nsasl.mechanism=PLAIN\nsasl.jaas.config
 internal_topics=(cardo.banking.events.v1 cardo.internal.transfers.v1 cardo.internal.topups.v1)
 public_topics=(cardo.transfers.v1 cardo.topups.v1 cardo.notifications.v1 cardo.processing-errors.v1)
 for topic in "${internal_topics[@]}" "${public_topics[@]}"; do
-  /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --command-config /tmp/cardo-admin.properties --create --if-not-exists --topic "$topic" --partitions 3 --replication-factor 1 --config retention.ms=259200000 --config retention.bytes=268435456 --config segment.bytes=16777216 >/dev/null
+  /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --command-config /tmp/cardo-admin.properties --create --if-not-exists --topic "$topic" --partitions 3 --replication-factor 1 --config retention.ms=259200000 --config retention.bytes=268435456 --config segment.bytes=16777216 --config segment.ms=3600000 >/dev/null
+  /opt/kafka/bin/kafka-configs.sh --bootstrap-server kafka:9092 --command-config /tmp/cardo-admin.properties --entity-type topics --entity-name "$topic" --alter --add-config retention.ms=259200000,retention.bytes=268435456,segment.bytes=16777216,segment.ms=3600000 >/dev/null
 done
 acl() {
   /opt/kafka/bin/kafka-acls.sh --bootstrap-server kafka:9092 --command-config /tmp/cardo-admin.properties --add --allow-principal "User:$1" "${@:2}" >/dev/null
@@ -39,5 +40,6 @@ acl metrics --operation Describe --cluster
 # to learners. No topic or consumer offset is deleted during this upgrade.
 for topic in cardo.practice.events.v1 cardo.practice.dead-letter.v1; do
   /opt/kafka/bin/kafka-acls.sh --bootstrap-server kafka:9092 --command-config /tmp/cardo-admin.properties --remove --force --allow-principal User:observer --operation Read --operation Describe --topic "$topic" >/dev/null
+  /opt/kafka/bin/kafka-configs.sh --bootstrap-server kafka:9092 --command-config /tmp/cardo-admin.properties --entity-type topics --entity-name "$topic" --alter --add-config retention.ms=259200000,retention.bytes=268435456,segment.bytes=16777216,segment.ms=3600000 >/dev/null
 done
 printf 'Cardo topics and least-privilege ACLs prepared\n'

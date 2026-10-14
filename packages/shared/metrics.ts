@@ -16,3 +16,19 @@ export function eventType(value: unknown) {
 export function routeLabel(value: string) {
   return value.split("?")[0].split("/").map(part => /^[0-9a-f-]{36}$/i.test(part) || /^(?:tu|tr|ex|ca|ac|r)[0-9a-f-]{16,}$/i.test(part) || /^\d+$/.test(part) ? ":id" : part).slice(0, 5).join("/").slice(0, 160);
 }
+
+export function publicRouteResolver(paths: string[]) {
+  const routes = paths.map(path => ({
+    template: path.replace(/\{[^}]+\}/g, ":id"),
+    pattern: new RegExp("^" + path.split("/").map(part => /^\{[^}]+\}$/.test(part) ? "[^/]+" : part.replace(/[.*+?^$()|[\]\\]/g, "\\$&")).join("/") + "/?$"),
+  }));
+  return (url: string) => {
+    const path = url.split("?")[0];
+    const route = routes.find(item => item.pattern.test(path));
+    if (route) return route.template;
+    if (path.startsWith("/api/docs")) return "/api/docs";
+    if (path.startsWith("/api/")) return "/api/unknown";
+    if (path.startsWith("/assets/")) return "/assets/:file";
+    return "/page";
+  };
+}

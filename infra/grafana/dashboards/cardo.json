@@ -1,23 +1,25 @@
 {
   "uid": "cardo-overview",
-  "title": "Cardo — сервисы и события",
+  "title": "Cardo — операции и диагностика",
   "tags": [
-    "cardo"
+    "cardo",
+    "qa"
   ],
   "schemaVersion": 41,
-  "version": 2,
+  "version": 3,
   "editable": false,
-  "refresh": "5s",
+  "refresh": "10s",
   "time": {
-    "from": "now-15m",
+    "from": "now-24h",
     "to": "now"
   },
   "timezone": "browser",
   "panels": [
     {
-      "id": 1,
-      "title": "HTTP-запросы в секунду",
-      "type": "timeseries",
+      "id": 11,
+      "title": "Переводы за 24 часа",
+      "description": "Число уникальных переводов внутри Cardo и в другие банки за последние 24 часа. Источник — события, сохранённые с операцией в PostgreSQL. Входящая проводка и комиссия не считаются отдельными переводами.",
+      "type": "stat",
       "datasource": {
         "type": "prometheus",
         "uid": "cardo-prometheus"
@@ -25,36 +27,91 @@
       "gridPos": {
         "x": 0,
         "y": 0,
-        "w": 12,
-        "h": 8
+        "w": 6,
+        "h": 4
       },
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by(service) (rate(cardo_http_requests_total[1m]))",
-          "legendFormat": "{{service}}"
+          "expr": "sum(cardo_completed_operations{kind=~\"transfer|external_transfer\",window=\"24h\"})",
+          "legendFormat": "{{service}}",
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "short"
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "Нет данных"
         },
         "overrides": []
       },
       "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
         },
-        "tooltip": {
-          "mode": "multi"
-        }
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none",
+        "wideLayout": true
       }
     },
     {
-      "id": 2,
-      "title": "Ответы 500–599",
-      "type": "timeseries",
+      "id": 12,
+      "title": "Пополнения за 24 часа",
+      "description": "Уникальные пополнения за последние 24 часа. Повтор запроса с тем же Idempotency-Key не увеличивает число.",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "cardo-prometheus"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(cardo_completed_operations{kind=\"topup\",window=\"24h\"})",
+          "legendFormat": "{{service}}",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "Нет данных"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 13,
+      "title": "Всего переводов",
+      "description": "Все переводы, сохранённые с событием в базе стенда. Показатель переживает перезапуск сервисов; демонстрационная история исключена.",
+      "type": "stat",
       "datasource": {
         "type": "prometheus",
         "uid": "cardo-prometheus"
@@ -62,21 +119,184 @@
       "gridPos": {
         "x": 12,
         "y": 0,
-        "w": 12,
-        "h": 8
+        "w": 6,
+        "h": 4
       },
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by(service) (increase(cardo_http_requests_total{status=~\"5..\"}[5m]))",
-          "legendFormat": "{{service}}"
+          "expr": "sum(cardo_completed_operations{kind=~\"transfer|external_transfer\",window=\"all\"})",
+          "legendFormat": "{{service}}",
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "short"
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "Нет данных"
         },
         "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 14,
+      "title": "Всего пополнений",
+      "description": "Все пополнения, сохранённые с событием в базе. Завершение финансовой операции не гарантирует успешную обработку уведомления.",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "cardo-prometheus"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(cardo_completed_operations{kind=\"topup\",window=\"all\"})",
+          "legendFormat": "{{service}}",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "Нет данных"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 15,
+      "title": "Когда совершались операции",
+      "description": "Уникальные события переводов и пополнений, дошедшие до Kafka и Kibana, по времени самой операции. Повтор одного eventId внутри интервала считается один раз. При задержке доставки график может появиться позже счётчика PostgreSQL. Доступная история ограничена сроком хранения логов.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "cardo-elasticsearch"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 24,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "service:telemetry AND message:\"event.observed\" AND topic:(\"cardo.transfers.v1\" OR \"cardo.topups.v1\")",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "cardinality",
+              "field": "eventId"
+            }
+          ],
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "terms",
+              "field": "type",
+              "settings": {
+                "size": "3",
+                "order": "desc",
+                "orderBy": "_term",
+                "min_doc_count": "1"
+              }
+            },
+            {
+              "id": "3",
+              "type": "date_histogram",
+              "field": "@timestamp",
+              "settings": {
+                "interval": "auto",
+                "min_doc_count": "0"
+              }
+            }
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "min": 0,
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 65,
+            "barAlignment": 0
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*banking\\.external-transfer\\.completed.*"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Перевод в другой банк"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*banking\\.transfer\\.completed.*"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Перевод внутри Cardo"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*banking\\.top-up\\.completed.*"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Пополнение"
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "legend": {
@@ -89,66 +309,171 @@
       }
     },
     {
-      "id": 3,
-      "title": "Время ответа p95",
-      "type": "timeseries",
+      "id": 16,
+      "title": "Последние завершённые операции",
+      "description": "До 20 уникальных финансовых операций в выбранном интервале, после доставки события через Kafka. Один eventId — одна строка, даже при повторной доставке. requestId позволяет найти цепочку в Kibana. Суммы показаны в валюте операции; персональные данные исключены.",
+      "type": "table",
       "datasource": {
-        "type": "prometheus",
-        "uid": "cardo-prometheus"
+        "type": "elasticsearch",
+        "uid": "cardo-elasticsearch"
       },
       "gridPos": {
         "x": 0,
-        "y": 8,
-        "w": 12,
-        "h": 8
+        "y": 11,
+        "w": 24,
+        "h": 9
       },
       "targets": [
         {
           "refId": "A",
-          "expr": "histogram_quantile(0.95, sum by(le,service) (rate(cardo_http_request_duration_seconds_bucket[5m])))",
-          "legendFormat": "{{service}}"
+          "queryType": "dsl",
+          "query": "{\"size\":20,\"sort\":[{\"@timestamp\":\"desc\"}],\"collapse\":{\"field\":\"eventId\"},\"_source\":[\"@timestamp\",\"type\",\"amount\",\"currency\",\"operationId\",\"requestId\",\"eventId\"],\"query\":{\"bool\":{\"filter\":[{\"term\":{\"service\":\"telemetry\"}},{\"term\":{\"message\":\"event.observed\"}},{\"terms\":{\"topic\":[\"cardo.transfers.v1\",\"cardo.topups.v1\"]}},{\"range\":{\"@timestamp\":{\"gte\":\"$__from\",\"lte\":\"$__to\",\"format\":\"epoch_millis\"}}}]}}}",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "raw_data",
+              "settings": {
+                "size": "20"
+              }
+            }
+          ],
+          "bucketAggs": []
+        }
+      ],
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "@timestamp",
+                "type",
+                "amount",
+                "currency",
+                "operationId",
+                "requestId"
+              ]
+            }
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "indexByName": {
+              "@timestamp": 0,
+              "type": 1,
+              "amount": 2,
+              "currency": 3,
+              "operationId": 4,
+              "requestId": 5
+            },
+            "renameByName": {
+              "@timestamp": "Время",
+              "type": "Операция",
+              "amount": "Сумма",
+              "currency": "Валюта",
+              "operationId": "ID операции",
+              "requestId": "requestId"
+            }
+          }
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "s"
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true
+          }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Операция"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "banking.transfer.completed": {
+                        "text": "Перевод внутри Cardo"
+                      },
+                      "banking.external-transfer.completed": {
+                        "text": "Перевод в другой банк"
+                      },
+                      "banking.top-up.completed": {
+                        "text": "Пополнение"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Время"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsIso"
+              },
+              {
+                "id": "custom.width",
+                "value": 210
+              }
+            ]
+          }
+        ]
       },
       "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": [
+          {
+            "displayName": "Время",
+            "desc": true
+          }
+        ]
       }
     },
     {
       "id": 4,
-      "title": "События в outbox",
+      "title": "События ожидают отправки в Kafka",
+      "description": "Outbox — записи в PostgreSQL, которые сервис ещё не подтвердил как отправленные в Kafka. Отдельные очереди Banking и Engagement. Краткий рост после действия нормален; устойчивый рост требует проверки доставки.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
         "uid": "cardo-prometheus"
       },
       "gridPos": {
-        "x": 12,
-        "y": 8,
+        "x": 0,
+        "y": 20,
         "w": 12,
-        "h": 8
+        "h": 6
       },
       "targets": [
         {
           "refId": "A",
           "expr": "cardo_outbox_pending",
-          "legendFormat": "{{service}}"
+          "legendFormat": "{{service}}",
+          "instant": false,
+          "range": true
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "short"
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "Нет данных"
         },
         "overrides": []
       },
@@ -164,28 +489,33 @@
     },
     {
       "id": 5,
-      "title": "Отставание обработчиков",
+      "title": "События ожидают обработки",
+      "description": "Непрочитанные позиции Kafka: cardo-engagement создаёт уведомления, cardo-practice-audit доставляет наблюдаемые события в Kibana. Ноль не гарантирует правильность результата: сверяй историю и уведомления.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
         "uid": "cardo-prometheus"
       },
       "gridPos": {
-        "x": 0,
-        "y": 16,
+        "x": 12,
+        "y": 20,
         "w": 12,
-        "h": 8
+        "h": 6
       },
       "targets": [
         {
           "refId": "A",
-          "expr": "cardo_kafka_consumer_lag",
-          "legendFormat": "{{group}} / {{topic}} / {{partition}}"
+          "expr": "sum by(group,topic) (cardo_kafka_consumer_lag)",
+          "legendFormat": "{{group}} · {{topic}}",
+          "instant": false,
+          "range": true
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "short"
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "Нет данных"
         },
         "overrides": []
       },
@@ -201,28 +531,33 @@
     },
     {
       "id": 6,
-      "title": "Обработка событий",
+      "title": "Результат обработки событий",
+      "description": "Успешные обработки и неудачные попытки Engagement за скользящие пять минут. Повторные попытки учитываются отдельно. Это не число финансовых операций.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
         "uid": "cardo-prometheus"
       },
       "gridPos": {
-        "x": 12,
-        "y": 16,
+        "x": 0,
+        "y": 26,
         "w": 12,
-        "h": 8
+        "h": 7
       },
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by(service,stage,result) (increase(cardo_events_total[5m]))",
-          "legendFormat": "{{service}} / {{stage}} / {{result}}"
+          "expr": "sum by(result) (increase(cardo_events_total{service=\"engagement\",stage=\"consume\"}[5m]))",
+          "legendFormat": "{{result}}",
+          "instant": false,
+          "range": true
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "short"
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "Нет данных"
         },
         "overrides": []
       },
@@ -239,64 +574,106 @@
     {
       "id": 7,
       "title": "Доступность сервисов",
+      "description": "1 — Prometheus смог опросить сервис, 0 — опрос не удался. Доступность метрик не заменяет проверку бизнес-сценария.",
       "type": "stat",
       "datasource": {
         "type": "prometheus",
         "uid": "cardo-prometheus"
       },
       "gridPos": {
-        "x": 0,
-        "y": 24,
+        "x": 12,
+        "y": 26,
         "w": 12,
-        "h": 8
+        "h": 7
       },
       "targets": [
         {
           "refId": "A",
           "expr": "up{job=\"cardo\"}",
-          "legendFormat": "{{instance}}"
+          "legendFormat": "{{service}}",
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "short"
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "Нет данных",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Недоступен",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "Доступен",
+                  "color": "green"
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "red"
+              },
+              {
+                "value": 1,
+                "color": "green"
+              }
+            ]
+          }
         },
         "overrides": []
       },
       "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
         },
-        "tooltip": {
-          "mode": "multi"
-        }
+        "textMode": "value_and_name",
+        "colorMode": "value",
+        "graphMode": "none",
+        "wideLayout": true
       }
     },
     {
-      "id": 8,
-      "title": "Очередь доставки логов",
+      "id": 2,
+      "title": "Ошибки 500–599 по сервисам",
+      "description": "Завершённые HTTP-запросы с серверной ошибкой за скользящие пять минут. Один пользовательский запрос может пройти через несколько сервисов; не складывай их как независимые сбои.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
         "uid": "cardo-prometheus"
       },
       "gridPos": {
-        "x": 12,
-        "y": 24,
+        "x": 0,
+        "y": 33,
         "w": 12,
-        "h": 8
+        "h": 7
       },
       "targets": [
         {
           "refId": "A",
-          "expr": "cardo_telemetry_queued",
-          "legendFormat": "{{service}}"
+          "expr": "sum by(service,route) (increase(cardo_http_requests_total{status=~\"5..\"}[5m]))",
+          "legendFormat": "{{service}} · {{route}}",
+          "instant": false,
+          "range": true
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "short"
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "Нет данных"
         },
         "overrides": []
       },
@@ -312,28 +689,33 @@
     },
     {
       "id": 9,
-      "title": "Ответы 404 с запуска сервисов",
+      "title": "Ответы 404 по маршрутам",
+      "description": "Запросы к отсутствующим ресурсам за пять минут. :id — шаблон идентификатора, а не реальное значение. Неизвестный путь API обозначен /api/unknown; его содержимое не пишется в логи.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
         "uid": "cardo-prometheus"
       },
       "gridPos": {
-        "x": 0,
-        "y": 32,
+        "x": 12,
+        "y": 33,
         "w": 12,
-        "h": 8
+        "h": 7
       },
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by(service,route) (cardo_http_requests_total{status=\"404\"})",
-          "legendFormat": "{{service}} / {{route}}"
+          "expr": "sum by(service,route) (increase(cardo_http_requests_total{status=\"404\",route!~\"/unmatched|\\\\*\"}[5m]))",
+          "legendFormat": "{{service}} · {{route}}",
+          "instant": false,
+          "range": true
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "short"
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "Нет данных"
         },
         "overrides": []
       },
@@ -349,47 +731,197 @@
     },
     {
       "id": 10,
-      "title": "Статусы API с запуска сервисов",
+      "title": "Ошибки API: сервис, маршрут и статус",
+      "description": "Счётчики ошибочных ответов с запуска сервиса. Здесь есть и ошибки валидации 4xx. Для конкретного действия используй requestId в Kibana.",
       "type": "table",
       "datasource": {
         "type": "prometheus",
         "uid": "cardo-prometheus"
       },
       "gridPos": {
-        "x": 12,
-        "y": 32,
-        "w": 12,
-        "h": 8
+        "x": 0,
+        "y": 40,
+        "w": 24,
+        "h": 7
       },
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by(service,route,status) (cardo_http_requests_total{route!~\"/health|/metrics|/unmatched\"})",
+          "expr": "sum by(service,route,status) (cardo_http_requests_total{status=~\"[45]..\",route!~\"/unmatched|\\\\*\"})",
+          "legendFormat": "{{service}}",
           "instant": true,
+          "range": false,
           "format": "table"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "short",
-          "decimals": 0
+          "decimals": 0,
+          "noValue": "Нет данных"
         },
         "overrides": []
       },
       "options": {
-        "showHeader": true
-      },
-      "transformations": [
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true
-            }
-          }
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
         }
-      ]
+      }
+    },
+    {
+      "id": 8,
+      "title": "Логи ожидают доставки в Kibana",
+      "description": "Буферы доставки логов в сервисах и сборщике. Ноль означает, что буфер пуст; при простое это нормальное состояние.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "cardo-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 47,
+        "w": 12,
+        "h": 6
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "cardo_telemetry_queued",
+          "legendFormat": "{{service}}",
+          "instant": false,
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "Нет данных"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 17,
+      "title": "Свободное место для данных Docker",
+      "description": "Доступное место на файловой системе контейнера сборщика. На сервере Cardo она находится на том же диске, что Docker и его тома. Жёлтый порог — меньше 10 ГБ, красный — меньше 5 ГБ.",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "cardo-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 47,
+        "w": 6,
+        "h": 6
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "cardo_storage_available_bytes",
+          "legendFormat": "{{service}}",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "decimals": 0,
+          "noValue": "Нет данных",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": null,
+                "color": "red"
+              },
+              {
+                "value": 5368709120,
+                "color": "orange"
+              },
+              {
+                "value": 10737418240,
+                "color": "green"
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 18,
+      "title": "Логи, не принятые из-за переполнения",
+      "description": "Отброшенные записи при заполнении ограниченных буферов. Если число растёт, проверь Elasticsearch и очередь доставки. Финансовые записи PostgreSQL этот механизм не удаляет.",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "cardo-prometheus"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 47,
+        "w": 6,
+        "h": 6
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(cardo_telemetry_dropped_total) or vector(0)",
+          "legendFormat": "{{service}}",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "Нет данных"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none",
+        "wideLayout": true
+      }
     }
-  ],
-  "links": []
+  ]
 }

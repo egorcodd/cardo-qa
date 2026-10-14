@@ -1,6 +1,9 @@
 name: cardo-qa
 x-app: &app
   restart: unless-stopped
+  logging: &logs
+    driver: local
+    options: { max-size: "10m", max-file: "3" }
   environment: &common
     INTERNAL_TOKEN: ${INTERNAL_TOKEN:-cardo-local-internal}
   healthcheck:
@@ -20,6 +23,7 @@ x-app: &app
 services:
   postgres:
     image: postgres:17-alpine
+    logging: *logs
     environment:
       POSTGRES_USER: cardo
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cardo_local_dev}
@@ -35,6 +39,7 @@ services:
       retries: 20
   db-setup:
     image: postgres:17-alpine
+    logging: *logs
     restart: "no"
     command: ["sh", "/provision.sh"]
     environment:

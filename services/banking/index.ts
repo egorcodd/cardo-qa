@@ -3,8 +3,10 @@ import { listen } from "../../packages/shared/http.ts";
 import { createBankingApp } from "./src/app.ts";
 import { createRatesClient } from "./src/integrations/rates.ts";
 import { startOutbox } from "./src/workers/outbox.ts";
+import { operationMetrics } from "./src/operation-metrics.ts";
 const pool = database("banking");
 await migrate(pool, new URL("./migrations/001-initial.sql", import.meta.url));
+operationMetrics(pool);
 const rates = createRatesClient(
   process.env.RATES_URL || "http://127.0.0.1:8084",
 );

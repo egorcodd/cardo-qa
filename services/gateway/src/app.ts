@@ -8,8 +8,10 @@ import { applySecurity } from "./security.ts";
 import { registerAuth } from "./auth.ts";
 import { registerProxy } from "./proxy.ts";
 import type { ServiceUrls } from "./dependencies.ts";
+import { publicRouteResolver } from "../../../packages/shared/metrics.ts";
 export function createGatewayApp(urls: ServiceUrls, dist: string) {
   const app = service("gateway");
+  app.locals.observationRoute = publicRouteResolver(Object.keys(openapi.paths).map(path => "/api" + path));
   app.use((_req, res, next) => {
     res.set("X-Robots-Tag", "noindex, nofollow");
     next();

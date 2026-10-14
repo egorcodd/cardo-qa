@@ -6,6 +6,11 @@ const messages = new Set(["http.request", "http.error", "event.published", "even
 export type SafeLog = Record<string, string | number>;
 export function safeLog(input: Record<string, unknown>): SafeLog | null {
   if (!services.has(String(input.service)) || !messages.has(String(input.message)) || !["info", "warn", "error"].includes(String(input.level))) return null;
+  if (input.message === "http.request" && Number(input.status) < 400) {
+    const mutation = ["POST", "PUT", "PATCH", "DELETE"].includes(String(input.method)) && String(input.route).startsWith("/api/");
+    const detail = input.method === "GET" && /^\/api\/(?:transactions\/:id|cards\/:id\/(?:requisites|account-requisites))$/.test(String(input.route));
+    if (!mutation && !detail) return null;
+  }
   const output: SafeLog = { "@timestamp": new Date().toISOString(), service: String(input.service), level: String(input.level), message: String(input.message) };
   if (typeof input["@timestamp"] === "string" && /^\d{4}-\d{2}-\d{2}T/.test(input["@timestamp"]) && !Number.isNaN(Date.parse(input["@timestamp"]))) output["@timestamp"] = new Date(input["@timestamp"]).toISOString();
   for (const key of ["requestId", "eventId", "causationId", "notificationId", "operationId", "topic", "group", "errorCode", "offset", "currency", "method", "kind", "category"])

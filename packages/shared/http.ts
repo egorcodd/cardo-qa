@@ -65,7 +65,7 @@ export function service(name: string, jsonLimit = "24kb") {
     res.set("X-Request-Id", requestId);
     res.on("finish", () => {
       if (req.path === "/health" || req.path === "/metrics") return;
-      const label = routeLabel(String(req.route?.path || "/unmatched"));
+      const label = routeLabel(app.locals.observationRoute?.(req.originalUrl) || String(req.route?.path || "/unknown"));
       const elapsed = performance.now() - start;
       requests.inc({ service: name, method: req.method, route: label, status: String(res.statusCode) });
       duration.observe({ service: name, method: req.method, route: label }, elapsed / 1000);
@@ -91,12 +91,12 @@ export function errors(app: ReturnType<typeof express>) {
     }),
   );
   app.use(
-    (error: unknown, _req: Request, res: Response, _next: NextFunction) => {
+    (error: unknown, req: Request, res: Response, _next: NextFunction) => {
       const e = error instanceof HttpError ? error : null;
       const syntax = error instanceof SyntaxError;
       const status = e?.status || (syntax ? 400 : 500);
       if (status >= 500)
-        log(app.locals.service, "error", "http.error", { requestId: res.locals.requestId, status, errorCode: e?.code || "INTERNAL_ERROR" });
+        log(app.locals.service, "error", "http.error", { requestId: res.locals.requestId, method: req.method, route: app.locals.observationRoute?.(req.originalUrl) || String(req.route?.path || "/unknown"), status, errorCode: e?.code || "INTERNAL_ERROR" });
       res.status(status).json({
         error: {
           code: e?.code || (syntax ? "INVALID_JSON" : "INTERNAL_ERROR"),

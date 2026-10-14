@@ -1,3 +1,6 @@
+x-logging: &logs
+  driver: local
+  options: { max-size: "10m", max-file: "3" }
 services:
   gateway:
     environment:
@@ -30,6 +33,7 @@ services:
       kafka-setup: { condition: service_completed_successfully }
       telemetry: { condition: service_healthy }
   kafka:
+    logging: *logs
     image: apache/kafka:4.2.2
     restart: unless-stopped
     mem_limit: 1536m
@@ -70,6 +74,7 @@ services:
       retries: 30
       start_period: 30s
   kafka-setup:
+    logging: *logs
     image: apache/kafka:4.2.2
     restart: "no"
     entrypoint: [bash, /etc/kafka/cardo/setup.sh]
@@ -79,6 +84,7 @@ services:
     depends_on:
       kafka: { condition: service_healthy }
   kafka-ui:
+    logging: *logs
     image: ghcr.io/kafbat/kafka-ui:v1.5.0
     restart: unless-stopped
     mem_limit: 768m
@@ -98,6 +104,7 @@ services:
     depends_on:
       kafka-setup: { condition: service_completed_successfully }
   elasticsearch:
+    logging: *logs
     image: docker.elastic.co/elasticsearch/elasticsearch:9.5.5
     restart: unless-stopped
     mem_limit: 2g
@@ -122,6 +129,7 @@ services:
       retries: 30
       start_period: 30s
   elastic-setup:
+    logging: *logs
     build: { context: ., target: service, args: { SERVICE: telemetry } }
     restart: "no"
     command: [node, services/telemetry/setup.ts, elastic]
@@ -135,6 +143,7 @@ services:
     depends_on:
       elasticsearch: { condition: service_healthy }
   kibana:
+    logging: *logs
     image: docker.elastic.co/kibana/kibana:9.5.5
     restart: unless-stopped
     mem_limit: 1536m
@@ -157,6 +166,7 @@ services:
       retries: 40
       start_period: 60s
   telemetry:
+    logging: *logs
     build: { context: ., target: service, args: { SERVICE: telemetry } }
     restart: unless-stopped
     mem_limit: 256m
@@ -178,6 +188,7 @@ services:
       timeout: 3s
       retries: 20
   prometheus:
+    logging: *logs
     image: prom/prometheus:v3.13.4
     restart: unless-stopped
     mem_limit: 512m
@@ -195,6 +206,7 @@ services:
       timeout: 3s
       retries: 20
   grafana:
+    logging: *logs
     image: grafana/grafana:13.2.4
     restart: unless-stopped
     mem_limit: 512m
@@ -223,6 +235,7 @@ services:
       timeout: 3s
       retries: 20
   tools-setup:
+    logging: *logs
     build: { context: ., target: service, args: { SERVICE: telemetry } }
     restart: "no"
     command: [node, services/telemetry/setup.ts, views]
