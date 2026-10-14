@@ -25,6 +25,7 @@ import { useRoute } from "./route.js";
 import Exchange from "./views/Exchange.jsx";
 import { registerWorker, disablePush } from "./pwa.js";
 import { uncertainError } from "./operationAttempt.js";
+import { BrandMark } from "./icons.jsx";
 
 export default function App() {
   const { t, lang, setLang } = useLang();
@@ -370,10 +371,30 @@ export default function App() {
   }
   if (checking)
     return (
-      <div className="load-state">
+      <div className="load-state startup-loading">
         <span className="spinner" />
         {t("common.loading")}
       </div>
+    );
+  if (!profile && loadErr)
+    return (
+      <main className="connection-screen">
+        <section className="connection-panel" role="alert" aria-labelledby="connection-title">
+          <div className="connection-brand">
+            <BrandMark />
+            <span>Cardo</span>
+          </div>
+          <h1 id="connection-title">{w("Нет связи с Cardo", "Cannot connect to Cardo")}</h1>
+          <p>
+            {loadErr === "Нет связи с Cardo. Проверь подключение и попробуй снова"
+              ? w("Проверь подключение к интернету и попробуй снова.", "Check your internet connection and try again.")
+              : loadErr}
+          </p>
+          <button type="button" className="btn-dark" onClick={() => window.location.reload()}>
+            {w("Повторить", "Retry")}
+          </button>
+        </section>
+      </main>
     );
   if (!profile)
     return (

@@ -17,7 +17,10 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET" || url.origin !== self.location.origin || url.pathname.startsWith("/api") || url.pathname === "/health" || url.pathname === "/metrics")
     return;
   if (request.mode === "navigate") {
-    event.respondWith(fetch(request).catch(() => caches.match("/index.html")));
+    event.respondWith(caches.open(VERSION).then(async (cache) => {
+      const shell = await cache.match("/index.html");
+      return shell || fetch(request);
+    }));
     return;
   }
   if (!ASSETS.includes(url.pathname)) return;

@@ -893,6 +893,63 @@ textarea {
   font-size: 14px;
   font-weight: 600;
 }
+
+.startup-loading {
+  min-height: 100dvh;
+  flex-direction: column;
+}
+.connection-screen {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: max(24px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+}
+.connection-panel {
+  width: 100%;
+  max-width: 420px;
+  padding: 32px;
+  border-radius: 26px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+.connection-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 24px;
+  color: var(--ink);
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.6px;
+}
+.connection-panel h1 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 26px;
+  line-height: 1.2;
+  font-weight: 800;
+  letter-spacing: -0.8px;
+  text-wrap: balance;
+}
+.connection-panel p {
+  margin: 12px 0 24px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 620px) {
+  .connection-panel {
+    padding: 28px 24px;
+    border-radius: 22px;
+  }
+  .connection-panel h1 {
+    font-size: 24px;
+  }
+}
+
 .load-err {
   color: var(--neg);
   text-align: center;

@@ -1,37 +1,48 @@
 async function req(path, opts = {}) {
-  const startedAt = performance.now();
-  let res;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10000);
+  const abort = () => controller.abort();
+  opts.signal?.addEventListener("abort", abort, { once: true });
+  if (opts.signal?.aborted) controller.abort();
   try {
-    res = await fetch("/api" + path, {
-      ...opts,
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json", ...(opts.headers || {}) },
-    });
-  } catch {
-    const err = new Error(
-      "Нет связи с Cardo. Проверь подключение и попробуй снова",
-    );
-    err.network = true;
-    throw err;
+    const startedAt = performance.now();
+    let res;
+    try {
+      res = await fetch("/api" + path, {
+        ...opts,
+        signal: controller.signal,
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", ...(opts.headers || {}) },
+      });
+    } catch {
+      const err = new Error(
+        "Нет связи с Cardo. Проверь подключение и попробуй снова",
+      );
+      err.network = true;
+      throw err;
+    }
+    let body;
+    try {
+      body = await res.json();
+    } catch {
+      const error = new Error(
+        "Ответ Cardo не получен полностью. Проверь историю операции",
+      );
+      error.network = true;
+      throw error;
+    }
+    if (!res.ok) {
+      const err = new Error(body.error?.message || "Не удалось выполнить запрос");
+      err.status = res.status;
+      err.code = body.error?.code;
+      throw err;
+    }
+    if (path === "/transactions" && performance.now() - startedAt > 1500) return [];
+    return body;
+  } finally {
+    clearTimeout(timer);
+    opts.signal?.removeEventListener("abort", abort);
   }
-  let body;
-  try {
-    body = await res.json();
-  } catch {
-    const error = new Error(
-      "Ответ Cardo не получен полностью. Проверь историю операции",
-    );
-    error.network = true;
-    throw error;
-  }
-  if (!res.ok) {
-    const err = new Error(body.error?.message || "Не удалось выполнить запрос");
-    err.status = res.status;
-    err.code = body.error?.code;
-    throw err;
-  }
-  if (path === "/transactions" && performance.now() - startedAt > 1500) return [];
-  return body;
 }
 const body = (method, value) => ({ method, body: JSON.stringify(value) });
 export const api = {

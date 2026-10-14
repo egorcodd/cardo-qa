@@ -16,7 +16,7 @@ function worker(overrides = {}) {
       ...overrides.self,
     },
     fetch: overrides.fetch || (() => Promise.reject(new Error("offline"))),
-    caches: overrides.caches || { match: async () => ({ shell: true }) },
+    caches: overrides.caches || { open: async () => ({ match: async () => ({ shell: true }) }) },
   };
   runInNewContext(source, env);
   return handlers;
