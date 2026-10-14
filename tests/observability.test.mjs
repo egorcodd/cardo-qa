@@ -1,8 +1,27 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { once } from "node:events";
+import { readFileSync } from "node:fs";
+import { runInNewContext } from "node:vm";
 import { safeLog, publicEvent } from "../packages/shared/telemetry.ts";
 import { service, errors } from "../packages/shared/http.ts";
+
+test("Cardo's installed worker leaves the shared observability pages to their own applications", async () => {
+  const handlers = new Map();
+  runInNewContext(readFileSync(new URL("../apps/web/public/sw.js", import.meta.url), "utf8"), {
+    URL,
+    self: { location: { origin: "https://cardo.example.test" }, addEventListener: (name, fn) => handlers.set(name, fn) },
+    caches: { open: async () => ({ match: async () => ({ cardoShell: true }) }) },
+  });
+  for (const path of ["/tools", "/tools/grafana/login", "/tools/kafka/", "/tools/kibana/s/cardo/app/discover"]) {
+    let intercepted = false;
+    handlers.get("fetch")({ request: { method: "GET", mode: "navigate", url: "https://cardo.example.test" + path }, respondWith: () => { intercepted = true; } });
+    assert.equal(intercepted, false, path);
+  }
+  let shell;
+  handlers.get("fetch")({ request: { method: "GET", mode: "navigate", url: "https://cardo.example.test/cards" }, respondWith: promise => { shell = promise; } });
+  assert.equal((await shell).cardoShell, true);
+});
 
 test("student logs use an allowlist and never carry request bodies or personal fields", () => {
   const entry = safeLog({ service: "banking", level: "error", message: "http.error", requestId: "qa-trace", errorCode: "INVALID_CARD", status: 500, name: "private-name", phone: "+79991234567", email: "private@example.test", password: "private-password", token: "private-token", cookie: "private-cookie", userId: "private-user", body: { card: "1234123412341234" }, stack: "private-stack", route: "/api/cards/1234?token=private-token" });

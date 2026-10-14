@@ -14,7 +14,7 @@ self.addEventListener("activate", (event) =>
 );
 self.addEventListener("fetch", (event) => {
   const request = event.request, url = new URL(request.url);
-  if (request.method !== "GET" || url.origin !== self.location.origin || url.pathname.startsWith("/api") || url.pathname === "/health" || url.pathname === "/metrics")
+  if (request.method !== "GET" || url.origin !== self.location.origin || url.pathname.startsWith("/api") || url.pathname === "/health" || url.pathname === "/metrics" || url.pathname === "/tools" || url.pathname.startsWith("/tools/"))
     return;
   if (request.mode === "navigate") {
     event.respondWith(caches.open(VERSION).then(async (cache) => {
