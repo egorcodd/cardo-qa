@@ -1,0 +1,14 @@
+# Include these handlers inside the existing cardo.egorcod.com site,
+# before its application fallback. No new DNS records are required.
+handle /tools/grafana* {
+  header X-Robots-Tag "noindex, nofollow"
+  reverse_proxy 127.0.0.1:3003
+}
+handle /tools/kafka* {
+  header X-Robots-Tag "noindex, nofollow"
+  reverse_proxy 127.0.0.1:8085
+}
+handle /tools/kibana* {
+  header X-Robots-Tag "noindex, nofollow"
+  reverse_proxy 127.0.0.1:5602
+}

@@ -1,0 +1,26 @@
+apiVersion: 1
+datasources:
+  - name: Cardo metrics
+    uid: cardo-prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      timeInterval: 5s
+  - name: Cardo logs
+    uid: cardo-elasticsearch
+    type: elasticsearch
+    access: proxy
+    url: http://elasticsearch:9200
+    basicAuth: true
+    basicAuthUser: cardo_reader
+    editable: false
+    jsonData:
+      index: cardo-logs-*
+      timeField: "@timestamp"
+      logMessageField: message
+      logLevelField: level
+    secureJsonData:
+      basicAuthPassword: $ELASTIC_READER_PASSWORD

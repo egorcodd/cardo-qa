@@ -1,0 +1,58 @@
+# Add after the base, private application override and observability files.
+# Public traffic reaches these services through the existing HTTPS proxy.
+x-required-secrets:
+  kafka-broker: ${KAFKA_BROKER_PASSWORD:?Set a private broker password}
+  kafka-admin: ${KAFKA_ADMIN_PASSWORD:?Set a private bootstrap password}
+  kafka-banking: ${KAFKA_BANKING_PASSWORD:?Set a private producer password}
+  kafka-engagement: ${KAFKA_ENGAGEMENT_PASSWORD:?Set a private consumer password}
+  kafka-observer: ${KAFKA_OBSERVER_PASSWORD:?Set a private readonly password}
+  kafka-metrics: ${KAFKA_METRICS_PASSWORD:?Set a private metrics password}
+  elastic-admin: ${ELASTIC_ADMIN_PASSWORD:?Set a private bootstrap password}
+  elastic-writer: ${ELASTIC_WRITER_PASSWORD:?Set a private ingest password}
+  elastic-reader: ${ELASTIC_READER_PASSWORD:?Set a private readonly password}
+  kibana-system: ${KIBANA_SYSTEM_PASSWORD:?Set a private system password}
+  grafana-admin: ${GRAFANA_ADMIN_PASSWORD:?Set a private bootstrap password}
+  grafana-key: ${GRAFANA_SECRET_KEY:?Set a private encryption key}
+  kibana-key: ${KIBANA_SECURITY_KEY:?Set a private encryption key}
+  kibana-objects-key: ${KIBANA_SAVED_OBJECTS_KEY:?Set a private encryption key}
+  kibana-report-key: ${KIBANA_REPORTING_KEY:?Set a private encryption key}
+  student: ${TOOLS_STUDENT_PASSWORD:?Set the shared readonly password}
+services:
+  kafka:
+    mem_limit: 1024m
+    environment:
+      KAFKA_HEAP_OPTS: -Xms256m -Xmx512m
+  elasticsearch:
+    mem_limit: 1536m
+    environment:
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+  telemetry:
+    mem_limit: 256m
+  prometheus:
+    mem_limit: 256m
+  grafana:
+    mem_limit: 384m
+    environment:
+      GF_SERVER_ROOT_URL: ${CARDO_TOOLS_ORIGIN:?Set the existing Cardo HTTPS origin}/tools/grafana/
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+      GF_SECURITY_COOKIE_SECURE: ${CARDO_TOOLS_COOKIE_SECURE:-true}
+  kafka-ui:
+    mem_limit: 512m
+    environment:
+      JAVA_OPTS: -Xms128m -Xmx256m
+      SERVER_SERVLET_CONTEXT_PATH: /tools/kafka
+      SERVER_FORWARD_HEADERS_STRATEGY: framework
+      SERVER_SERVLET_SESSION_COOKIE_SECURE: ${CARDO_TOOLS_COOKIE_SECURE:-true}
+  kibana:
+    mem_limit: 1024m
+    environment:
+      NODE_OPTIONS: --max-old-space-size=768
+      SERVER_BASEPATH: /tools/kibana
+      SERVER_REWRITEBASEPATH: "true"
+      XPACK_SECURITY_SECURECOOKIES: ${CARDO_TOOLS_COOKIE_SECURE:-true}
+    healthcheck:
+      test: [CMD-SHELL, "curl -fsS http://127.0.0.1:5601/tools/kibana/api/status >/dev/null"]
+  tools-setup:
+    environment:
+      GRAFANA_URL: http://grafana:3000/tools/grafana
+      KIBANA_URL: http://kibana:5601/tools/kibana

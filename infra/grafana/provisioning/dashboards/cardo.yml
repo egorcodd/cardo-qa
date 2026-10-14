@@ -1,0 +1,12 @@
+apiVersion: 1
+providers:
+  - name: Cardo
+    orgId: 1
+    folder: Cardo
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    # Polling also detects edits made through Windows Docker bind mounts.
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/grafana/dashboards

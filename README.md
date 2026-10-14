@@ -12,6 +12,7 @@ Cardo создан для практики тестировщиков и исп�
 - Cardo Плюс, баллы и награды.
 - Уведомления, напоминания, PWA и Web Push.
 - REST API со Swagger и сохранение данных в PostgreSQL.
+- Kafka и просмотр событий, Grafana с метриками, Kibana с логами сервисов.
 
 ## Практика QA
 
@@ -61,9 +62,29 @@ docker compose down
 
 Сервисы общаются через HTTP и события через outbox/inbox. PostgreSQL один, с отдельными схемами и ролями customer, banking, engagement и rates. `db-setup` подготавливает локальные схемы и роли; его завершение с кодом 0 нормально.
 
+При запуске с инструментами Banking публикует события из outbox в Kafka, Engagement читает их и создаёт уведомления. Prometheus собирает метрики для Grafana; отдельный сборщик доставляет очищенные логи в Elasticsearch для Kibana.
+
 Исходники интерфейса находятся в `apps/web`, сервисов в `services`, общие контракты в `packages/contracts`, технические функции в `packages/shared`.
 
 ## API и документация
+
+### Kafka, Grafana и Kibana
+
+Для практики событий, метрик и логов запусти расширенное окружение:
+
+```sh
+docker compose -f docker-compose.yml -f docker-compose.observability.yml up -d --build
+```
+
+| Инструмент | Локальный адрес |
+| --- | --- |
+| Kafka UI | http://localhost:8085 |
+| Grafana | http://localhost:3003/d/cardo-overview |
+| Kibana | http://localhost:5602/s/cardo/app/discover |
+
+Локальный учебный вход в эти инструменты: `student` / `cardo_student_dev`. У аккаунта только просмотр. Первый запуск скачивает образы и подготавливает источники данных. Для Docker выдели минимум 8 ГБ памяти. Адреса и пароли меняются через `.env`.
+
+Как найти событие своей операции и связать его с логами и метриками: [инструкция](docs/OBSERVABILITY.md).
 
 Swagger доступен на `/api/docs`; спецификация на `/api/openapi.json`. Для запросов в Postman используй Bearer Token из ответа регистрации или входа. В браузере авторизация работает через cookie.
 

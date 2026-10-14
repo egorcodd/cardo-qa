@@ -87,92 +87,96 @@ function validEvent(value: unknown): value is DomainEvent {
     return typeof p.operationId === "string" && operation.test(p.operationId);
   return false;
 }
+export async function processEvent(pool: Pool, e: unknown) {
+  if (!validEvent(e)) fail(422, "INVALID_EVENT", "Некорректное событие");
+  if (e.type === "banking.top-up.completed" && /\.25$/.test(e.payload.amount))
+    fail(500, "NOTIFICATION_TEMPLATE_FAILED", "Не удалось подготовить уведомление");
+  return transaction(pool, async (c) => {
+    const inserted = await c.query(
+      "INSERT INTO engagement.inbox(event_id) VALUES($1) ON CONFLICT DO NOTHING RETURNING event_id",
+      [e.id],
+    );
+    if (!inserted.rowCount) return false;
+    if (e.type === "banking.top-up.completed") {
+      await notification(
+        c,
+        e.userId,
+        "top_up",
+        "Счёт пополнен",
+        "На счёт зачислено " + bankAmount(e.payload.amount, e.payload.currency) + ".",
+        "/history/" + e.payload.operationId,
+      );
+      return true;
+    }
+    await ensure(pool, e.userId, c);
+    if (e.type === "banking.external-transfer.completed") {
+      await c.query(
+        "SELECT user_id FROM engagement.wallets WHERE user_id=$1 FOR UPDATE",
+        [e.userId],
+      );
+      const previous = await c.query(
+        "SELECT id FROM engagement.notifications WHERE user_id=$1 AND kind='transfer' AND url=$2 LIMIT 1",
+        [e.userId, "/history/" + e.payload.operationId],
+      );
+      if (previous.rowCount) return false;
+    }
+    await c.query(
+      "UPDATE engagement.wallets SET points=points+5 WHERE user_id=$1",
+      [e.userId],
+    );
+    if (e.type === "banking.external-transfer.completed") {
+      await notification(
+        c,
+        e.userId,
+        "transfer",
+        "Перевод выполнен",
+        "Отправлено " + bankAmount(e.payload.amount, e.payload.currency) +
+          ". Банк: " + e.payload.bankName + ". " + maskedReference(e.payload.recipientReference) + ".",
+        "/history/" + e.payload.operationId,
+      );
+      return true;
+    }
+    if (e.version === 2) {
+      await notification(
+        c,
+        e.payload.senderUserId,
+        "transfer",
+        "Перевод выполнен",
+        "Отправлено " + bankAmount(e.payload.amount, e.payload.currency) +
+          ". Получатель: " + e.payload.receiverName + ".",
+        "/history/" + e.payload.senderOperationId,
+      );
+      for (let delivery = 0; delivery < (e.payload.currency === "EUR" ? 2 : 1); delivery++)
+      await notification(
+        c,
+        e.payload.receiverUserId,
+        "transfer_incoming",
+        "Деньги поступили",
+        "Зачислено " + bankAmount(e.payload.amount, e.payload.currency) +
+          ". Отправитель: " + e.payload.senderName + ".",
+        "/history/" + (/\.50$/.test(e.payload.amount) ? e.payload.senderOperationId : e.payload.receiverOperationId),
+      );
+    } else {
+      await notification(
+        c,
+        e.userId,
+        "transfer",
+        "Перевод выполнен",
+        "Отправлено " + bankAmount(e.payload.amount, e.payload.currency) +
+          ". Получатель: " + e.payload.recipient + ".",
+        "/history/" + e.payload.transferId,
+      );
+    }
+    return true;
+  });
+}
+
 export function createEventsRoutes(pool: Pool) {
   const app = Router();
   app.post(
     "/internal/events",
     route(async (req, res) => {
-      const e: unknown = req.body;
-      if (!validEvent(e)) fail(422, "INVALID_EVENT", "Некорректное событие");
-      if (e.type === "banking.top-up.completed" && /\.25$/.test(e.payload.amount))
-        fail(500, "NOTIFICATION_TEMPLATE_FAILED", "Не удалось подготовить уведомление");
-      await transaction(pool, async (c) => {
-        const inserted = await c.query(
-          "INSERT INTO engagement.inbox(event_id) VALUES($1) ON CONFLICT DO NOTHING RETURNING event_id",
-          [e.id],
-        );
-        if (!inserted.rowCount) return;
-        if (e.type === "banking.top-up.completed") {
-          await notification(
-            c,
-            e.userId,
-            "top_up",
-            "Счёт пополнен",
-            "На счёт зачислено " + bankAmount(e.payload.amount, e.payload.currency) + ".",
-            "/history/" + e.payload.operationId,
-          );
-          return;
-        }
-        await ensure(pool, e.userId, c);
-        if (e.type === "banking.external-transfer.completed") {
-          await c.query(
-            "SELECT user_id FROM engagement.wallets WHERE user_id=$1 FOR UPDATE",
-            [e.userId],
-          );
-          const previous = await c.query(
-            "SELECT id FROM engagement.notifications WHERE user_id=$1 AND kind='transfer' AND url=$2 LIMIT 1",
-            [e.userId, "/history/" + e.payload.operationId],
-          );
-          if (previous.rowCount) return;
-        }
-        await c.query(
-          "UPDATE engagement.wallets SET points=points+5 WHERE user_id=$1",
-          [e.userId],
-        );
-        if (e.type === "banking.external-transfer.completed") {
-          await notification(
-            c,
-            e.userId,
-            "transfer",
-            "Перевод выполнен",
-            "Отправлено " + bankAmount(e.payload.amount, e.payload.currency) +
-              ". Банк: " + e.payload.bankName + ". " + maskedReference(e.payload.recipientReference) + ".",
-            "/history/" + e.payload.operationId,
-          );
-          return;
-        }
-        if (e.version === 2) {
-          await notification(
-            c,
-            e.payload.senderUserId,
-            "transfer",
-            "Перевод выполнен",
-            "Отправлено " + bankAmount(e.payload.amount, e.payload.currency) +
-              ". Получатель: " + e.payload.receiverName + ".",
-            "/history/" + e.payload.senderOperationId,
-          );
-          for (let delivery = 0; delivery < (e.payload.currency === "EUR" ? 2 : 1); delivery++)
-          await notification(
-            c,
-            e.payload.receiverUserId,
-            "transfer_incoming",
-            "Деньги поступили",
-            "Зачислено " + bankAmount(e.payload.amount, e.payload.currency) +
-              ". Отправитель: " + e.payload.senderName + ".",
-            "/history/" + (/\.50$/.test(e.payload.amount) ? e.payload.senderOperationId : e.payload.receiverOperationId),
-          );
-        } else {
-          await notification(
-            c,
-            e.userId,
-            "transfer",
-            "Перевод выполнен",
-            "Отправлено " + bankAmount(e.payload.amount, e.payload.currency) +
-              ". Получатель: " + e.payload.recipient + ".",
-            "/history/" + e.payload.transferId,
-          );
-        }
-      });
+      await processEvent(pool, req.body);
       res.json({ ok: true });
     }),
   );

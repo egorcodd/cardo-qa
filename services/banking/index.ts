@@ -8,7 +8,7 @@ await migrate(pool, new URL("./migrations/001-initial.sql", import.meta.url));
 const rates = createRatesClient(
   process.env.RATES_URL || "http://127.0.0.1:8084",
 );
-const stop = startOutbox(
+const stop = await startOutbox(
   pool,
   process.env.ENGAGEMENT_URL || "http://127.0.0.1:8083",
 );

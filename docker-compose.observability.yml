@@ -1,0 +1,243 @@
+services:
+  gateway:
+    environment:
+      TELEMETRY_URL: http://telemetry:8086
+      SERVICE: gateway
+  customer:
+    environment:
+      TELEMETRY_URL: http://telemetry:8086
+  rates:
+    environment:
+      TELEMETRY_URL: http://telemetry:8086
+  banking:
+    environment:
+      TELEMETRY_URL: http://telemetry:8086
+      EVENT_TRANSPORT: kafka
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_USERNAME: banking
+      KAFKA_PASSWORD: ${KAFKA_BANKING_PASSWORD:-cardo_banking_kafka_dev}
+    depends_on:
+      kafka-setup: { condition: service_completed_successfully }
+      telemetry: { condition: service_healthy }
+  engagement:
+    environment:
+      TELEMETRY_URL: http://telemetry:8086
+      EVENT_TRANSPORT: kafka
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_USERNAME: engagement
+      KAFKA_PASSWORD: ${KAFKA_ENGAGEMENT_PASSWORD:-cardo_engagement_kafka_dev}
+    depends_on:
+      kafka-setup: { condition: service_completed_successfully }
+      telemetry: { condition: service_healthy }
+  kafka:
+    image: apache/kafka:4.2.2
+    restart: unless-stopped
+    mem_limit: 1536m
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: INTERNAL://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:SASL_PLAINTEXT,CONTROLLER:SASL_PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL: PLAIN
+      KAFKA_SASL_MECHANISM_CONTROLLER_PROTOCOL: PLAIN
+      KAFKA_SASL_ENABLED_MECHANISMS: PLAIN
+      KAFKA_LISTENER_NAME_INTERNAL_PLAIN_SASL_JAAS_CONFIG: 'org.apache.kafka.common.security.plain.PlainLoginModule required username="broker" password="${KAFKA_BROKER_PASSWORD:-cardo_broker_kafka_dev}" user_broker="${KAFKA_BROKER_PASSWORD:-cardo_broker_kafka_dev}" user_admin="${KAFKA_ADMIN_PASSWORD:-cardo_admin_kafka_dev}" user_banking="${KAFKA_BANKING_PASSWORD:-cardo_banking_kafka_dev}" user_engagement="${KAFKA_ENGAGEMENT_PASSWORD:-cardo_engagement_kafka_dev}" user_observer="${KAFKA_OBSERVER_PASSWORD:-cardo_observer_kafka_dev}" user_metrics="${KAFKA_METRICS_PASSWORD:-cardo_metrics_kafka_dev}";'
+      KAFKA_LISTENER_NAME_CONTROLLER_PLAIN_SASL_JAAS_CONFIG: 'org.apache.kafka.common.security.plain.PlainLoginModule required username="broker" password="${KAFKA_BROKER_PASSWORD:-cardo_broker_kafka_dev}" user_broker="${KAFKA_BROKER_PASSWORD:-cardo_broker_kafka_dev}";'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_AUTHORIZER_CLASS_NAME: org.apache.kafka.metadata.authorizer.StandardAuthorizer
+      KAFKA_SUPER_USERS: User:broker;User:admin
+      KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: "false"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_NUM_PARTITIONS: 1
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_LOG_RETENTION_HOURS: 72
+      KAFKA_HEAP_OPTS: -Xms512m -Xmx768m
+      CLUSTER_ID: q1Sh-9_ISia_zwGINzRvyQ
+      KAFKA_ADMIN_PASSWORD: ${KAFKA_ADMIN_PASSWORD:-cardo_admin_kafka_dev}
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+      - ./infra/kafka:/etc/kafka/cardo:ro
+    healthcheck:
+      test: [CMD, bash, /etc/kafka/cardo/health.sh]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 30s
+  kafka-setup:
+    image: apache/kafka:4.2.2
+    restart: "no"
+    entrypoint: [bash, /etc/kafka/cardo/setup.sh]
+    environment:
+      KAFKA_ADMIN_PASSWORD: ${KAFKA_ADMIN_PASSWORD:-cardo_admin_kafka_dev}
+    volumes: ["./infra/kafka:/etc/kafka/cardo:ro"]
+    depends_on:
+      kafka: { condition: service_healthy }
+  kafka-ui:
+    image: ghcr.io/kafbat/kafka-ui:v1.5.0
+    restart: unless-stopped
+    mem_limit: 768m
+    ports: ["127.0.0.1:${KAFKA_UI_PORT:-8085}:8080"]
+    environment:
+      AUTH_TYPE: LOGIN_FORM
+      SPRING_SECURITY_USER_NAME: student
+      SPRING_SECURITY_USER_PASSWORD: ${TOOLS_STUDENT_PASSWORD:-cardo_student_dev}
+      DYNAMIC_CONFIG_ENABLED: "false"
+      KAFKA_CLUSTERS_0_NAME: Cardo practice
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      KAFKA_CLUSTERS_0_READONLY: "true"
+      KAFKA_CLUSTERS_0_PROPERTIES_SECURITY_PROTOCOL: SASL_PLAINTEXT
+      KAFKA_CLUSTERS_0_PROPERTIES_SASL_MECHANISM: PLAIN
+      KAFKA_CLUSTERS_0_PROPERTIES_SASL_JAAS_CONFIG: 'org.apache.kafka.common.security.plain.PlainLoginModule required username="observer" password="${KAFKA_OBSERVER_PASSWORD:-cardo_observer_kafka_dev}";'
+      JAVA_OPTS: -Xms128m -Xmx512m
+    depends_on:
+      kafka-setup: { condition: service_completed_successfully }
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.5.5
+    restart: unless-stopped
+    mem_limit: 2g
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "true"
+      xpack.security.http.ssl.enabled: "false"
+      xpack.security.transport.ssl.enabled: "false"
+      xpack.ml.enabled: "false"
+      ingest.geoip.downloader.enabled: "false"
+      ELASTIC_PASSWORD: ${ELASTIC_ADMIN_PASSWORD:-cardo_elastic_admin_dev}
+      ES_JAVA_OPTS: -Xms768m -Xmx768m
+    volumes: ["elastic-data:/usr/share/elasticsearch/data"]
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - |
+          printf 'user = "elastic:%s"\n' "$$ELASTIC_PASSWORD" |
+          curl --config - -fsS http://127.0.0.1:9200/_cluster/health >/dev/null
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+  elastic-setup:
+    build: { context: ., target: service, args: { SERVICE: telemetry } }
+    restart: "no"
+    command: [node, services/telemetry/setup.ts, elastic]
+    environment:
+      ELASTIC_URL: http://elasticsearch:9200
+      ELASTIC_ADMIN_PASSWORD: ${ELASTIC_ADMIN_PASSWORD:-cardo_elastic_admin_dev}
+      ELASTIC_WRITER_PASSWORD: ${ELASTIC_WRITER_PASSWORD:-cardo_elastic_writer_dev}
+      ELASTIC_READER_PASSWORD: ${ELASTIC_READER_PASSWORD:-cardo_elastic_reader_dev}
+      KIBANA_SYSTEM_PASSWORD: ${KIBANA_SYSTEM_PASSWORD:-cardo_kibana_system_dev}
+      TOOLS_STUDENT_PASSWORD: ${TOOLS_STUDENT_PASSWORD:-cardo_student_dev}
+    depends_on:
+      elasticsearch: { condition: service_healthy }
+  kibana:
+    image: docker.elastic.co/kibana/kibana:9.5.5
+    restart: unless-stopped
+    mem_limit: 1536m
+    ports: ["127.0.0.1:${KIBANA_PORT:-5602}:5601"]
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+      ELASTICSEARCH_USERNAME: kibana_system
+      ELASTICSEARCH_PASSWORD: ${KIBANA_SYSTEM_PASSWORD:-cardo_kibana_system_dev}
+      TELEMETRY_ENABLED: "false"
+      XPACK_SECURITY_ENCRYPTIONKEY: ${KIBANA_SECURITY_KEY:-cardo_local_security_key_32_chars}
+      XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY: ${KIBANA_SAVED_OBJECTS_KEY:-cardo_local_saved_objects_32_chars}
+      XPACK_REPORTING_ENCRYPTIONKEY: ${KIBANA_REPORTING_KEY:-cardo_local_reporting_key_32_chars}
+      NODE_OPTIONS: --max-old-space-size=1024
+    depends_on:
+      elastic-setup: { condition: service_completed_successfully }
+    healthcheck:
+      test: [CMD-SHELL, "curl -fsS http://127.0.0.1:5601/api/status >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 40
+      start_period: 60s
+  telemetry:
+    build: { context: ., target: service, args: { SERVICE: telemetry } }
+    restart: unless-stopped
+    mem_limit: 256m
+    environment:
+      SERVICE: telemetry
+      PORT: 8086
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:-cardo-local-internal}
+      ELASTIC_URL: http://elasticsearch:9200
+      ELASTIC_WRITER_PASSWORD: ${ELASTIC_WRITER_PASSWORD:-cardo_elastic_writer_dev}
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_USERNAME: metrics
+      KAFKA_PASSWORD: ${KAFKA_METRICS_PASSWORD:-cardo_metrics_kafka_dev}
+    depends_on:
+      elastic-setup: { condition: service_completed_successfully }
+      kafka-setup: { condition: service_completed_successfully }
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:8086/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  prometheus:
+    image: prom/prometheus:v3.13.4
+    restart: unless-stopped
+    mem_limit: 512m
+    ports: ["127.0.0.1:${PROMETHEUS_PORT:-9091}:9090"]
+    entrypoint: [/bin/sh, /etc/prometheus/start.sh]
+    environment:
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:-cardo-local-internal}
+    volumes:
+      - prometheus-data:/prometheus
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infra/prometheus/start.sh:/etc/prometheus/start.sh:ro
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:9090/-/ready]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  grafana:
+    image: grafana/grafana:13.2.4
+    restart: unless-stopped
+    mem_limit: 512m
+    ports: ["127.0.0.1:${GRAFANA_PORT:-3003}:3000"]
+    environment:
+      GF_SECURITY_ADMIN_USER: operator
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-cardo_grafana_admin_dev}
+      GF_SECURITY_SECRET_KEY: ${GRAFANA_SECRET_KEY:-cardo_local_grafana_secret_32_chars}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_USERS_ALLOW_ORG_CREATE: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+      ELASTIC_READER_PASSWORD: ${ELASTIC_READER_PASSWORD:-cardo_elastic_reader_dev}
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/grafana/dashboards:/etc/grafana/dashboards:ro
+    depends_on:
+      prometheus: { condition: service_healthy }
+      elastic-setup: { condition: service_completed_successfully }
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:3000/api/health]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  tools-setup:
+    build: { context: ., target: service, args: { SERVICE: telemetry } }
+    restart: "no"
+    command: [node, services/telemetry/setup.ts, views]
+    environment:
+      ELASTIC_URL: http://elasticsearch:9200
+      ELASTIC_ADMIN_PASSWORD: ${ELASTIC_ADMIN_PASSWORD:-cardo_elastic_admin_dev}
+      KIBANA_URL: http://kibana:5601
+      GRAFANA_URL: http://grafana:3000
+      GRAFANA_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-cardo_grafana_admin_dev}
+      TOOLS_STUDENT_PASSWORD: ${TOOLS_STUDENT_PASSWORD:-cardo_student_dev}
+    depends_on:
+      grafana: { condition: service_healthy }
+      kibana: { condition: service_healthy }
+volumes:
+  kafka-data:
+  elastic-data:
+  prometheus-data:
+  grafana-data:

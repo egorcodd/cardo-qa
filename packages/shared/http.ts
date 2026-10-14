@@ -1,6 +1,8 @@
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
 import { randomUUID, timingSafeEqual } from "node:crypto";
+import { registry, requests, duration, routeLabel } from "./metrics.ts";
+import { log, flushLogs } from "./telemetry.ts";
 export class HttpError extends Error {
   status: number;
   code: string;
@@ -48,11 +50,10 @@ export function context(req: Request): string {
     fail(401, "UNAUTHORIZED", "Войди в аккаунт");
   return id;
 }
-export function service(name: string) {
+export function service(name: string, jsonLimit = "24kb") {
   const app = express();
   app.disable("x-powered-by");
-  app.use(express.json({ limit: "24kb" }));
-  const counts = new Map<string, number>();
+  app.locals.service = name;
   app.use((req, res, next) => {
     const start = performance.now();
     const supplied = req.header("X-Request-Id");
@@ -63,44 +64,20 @@ export function service(name: string) {
     res.locals.requestId = requestId;
     res.set("X-Request-Id", requestId);
     res.on("finish", () => {
-      const label =
-        req.route?.path || req.path.split("/").slice(0, 3).join("/");
-      const k = String(label) + "|" + res.statusCode;
-      counts.set(k, (counts.get(k) || 0) + 1);
-      if (req.path !== "/health" && req.path !== "/metrics")
-        console.log(
-          JSON.stringify({
-            level: "info",
-            service: name,
-            requestId,
-            method: req.method,
-            route: label,
-            status: res.statusCode,
-            durationMs: Math.round(performance.now() - start),
-          }),
-        );
+      if (req.path === "/health" || req.path === "/metrics") return;
+      const label = routeLabel(String(req.route?.path || "/unmatched"));
+      const elapsed = performance.now() - start;
+      requests.inc({ service: name, method: req.method, route: label, status: String(res.statusCode) });
+      duration.observe({ service: name, method: req.method, route: label }, elapsed / 1000);
+      log(name, "info", "http.request", { requestId, method: req.method, route: label, status: res.statusCode, durationMs: Math.round(elapsed) });
     });
     next();
   });
-  app.get("/metrics", (_req, res) =>
-    res.type("text/plain").send(
-      [...counts]
-        .map(([k, n]) => {
-          const [path, status] = k.split("|");
-          return (
-            'cardo_http_requests_total{service="' +
-            name +
-            '",route="' +
-            path +
-            '",status="' +
-            status +
-            '"} ' +
-            n
-          );
-        })
-        .join("\n") + "\n",
-    ),
-  );
+  app.use(express.json({ limit: jsonLimit }));
+  app.get("/metrics", (req, res, next) => {
+    if (req.header("Authorization") === "Bearer " + secret) return next();
+    internal(req, res, next);
+  }, route(async (_req, res) => { res.type(registry.contentType).send(await registry.metrics()); }));
   return app;
 }
 export function errors(app: ReturnType<typeof express>) {
@@ -119,13 +96,7 @@ export function errors(app: ReturnType<typeof express>) {
       const syntax = error instanceof SyntaxError;
       const status = e?.status || (syntax ? 400 : 500);
       if (status >= 500)
-        console.error(
-          JSON.stringify({
-            level: "error",
-            requestId: res.locals.requestId,
-            message: error instanceof Error ? error.message : "Unknown error",
-          }),
-        );
+        log(app.locals.service, "error", "http.error", { requestId: res.locals.requestId, status, errorCode: e?.code || "INTERNAL_ERROR" });
       res.status(status).json({
         error: {
           code: e?.code || (syntax ? "INVALID_JSON" : "INTERNAL_ERROR"),
@@ -171,6 +142,7 @@ export function listen(
     server.close(async () => {
       try {
         await cleanup();
+        await flushLogs();
         process.exitCode = 0;
       } catch (error) {
         console.error(error);
