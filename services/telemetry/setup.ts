@@ -12,6 +12,39 @@ const elastic = required("ELASTIC_URL");
 const password = required("ELASTIC_ADMIN_PASSWORD");
 const es = (path: string, method: string, body: unknown, allowed: number[] = []) => call(elastic, path, method, body, "elastic", password, allowed);
 
+async function setupDiscover(kibana: string) {
+  const path = "/s/cardo/api/saved_objects/search/cardo-actions";
+  const saved = await call(kibana, path, "GET", undefined, "elastic", password, [404]);
+  const defaults = {
+    columns: ["service", "message", "type", "method", "route", "status", "requestId", "eventId"],
+    sort: [["@timestamp", "desc"]],
+    timeRestore: true,
+    timeRange: { from: "now-15m", to: "now" },
+    refreshInterval: { pause: false, value: 10000 },
+  };
+  const previous = saved?.attributes as Record<string, unknown> | undefined;
+  const tabs = previous?.tabs as { id: string; label: string; attributes: Record<string, unknown> }[] | undefined;
+  const attributes = tabs?.length ? {
+    ...previous,
+    tabs: tabs.map((tab, index) => index === 0 ? { ...tab, attributes: { ...tab.attributes, ...defaults } } : tab),
+  } : {
+    title: "Действия и ошибки Cardo",
+    description: "Действия пользователя, ошибки и обработка событий. Успешные фоновые обновления списков исключены.",
+    tabs: [{
+      id: "60f39e60-e83e-58ab-ae2f-46a5c465798f", label: "Действия и ошибки", attributes: {
+        ...defaults,
+        kibanaSavedObjectMeta: { searchSourceJSON: JSON.stringify({
+          indexRefName: "kibanaSavedObjectMeta.searchSourceJSON.index",
+          query: { language: "kuery", query: 'not (message : "http.request" and status < 400 and (method : (GET or HEAD) or route : "/internal/session" or route : "/unmatched"))' },
+          filter: [],
+        }) },
+      },
+    }],
+  };
+  const references = saved?.references || [{ type: "index-pattern", id: "cardo-logs", name: "kibanaSavedObjectMeta.searchSourceJSON.index" }];
+  await call(kibana, path, previous ? "PUT" : "POST", { attributes, references, ...(saved?.version ? { version: saved.version } : {}) }, "elastic", password);
+}
+
 if (process.argv[2] === "elastic") {
   await es("/_security/user/kibana_system/_password", "POST", { password: required("KIBANA_SYSTEM_PASSWORD") });
   await es("/_security/role/cardo_writer", "PUT", { cluster: ["monitor"], indices: [{ names: ["cardo-logs", "cardo-logs-*"], privileges: ["create_doc"] }] });
@@ -28,24 +61,13 @@ if (process.argv[2] === "elastic") {
   // The template governs future indices; existing strict indices need the same
   // additive fields before producers start sending notification correlations.
   await es("/cardo-logs-*/_mapping", "PUT", { properties: Object.fromEntries(["causationId", "notificationId", "kind", "category"].map(field => [field, properties[field]])) });
+} else if (process.argv[2] === "discover") {
+  await setupDiscover(required("KIBANA_URL"));
 } else if (process.argv[2] === "views") {
   const kibana = required("KIBANA_URL");
   await call(kibana, "/api/spaces/space", "POST", { id: "cardo", name: "Cardo", description: "Логи учебного банка Cardo", disabledFeatures: ["dev_tools", "advancedSettings", "stackAlerts", "savedObjectsManagement"] }, "elastic", password, [409]);
   await call(kibana, "/s/cardo/api/data_views/data_view", "POST", { override: true, data_view: { id: "cardo-logs", name: "Cardo logs", title: "cardo-logs-*", timeFieldName: "@timestamp", allowNoIndex: false } }, "elastic", password);
-  await call(kibana, "/s/cardo/api/saved_objects/search/cardo-actions?overwrite=true", "POST", {
-    attributes: {
-      title: "Действия и ошибки Cardo",
-      description: "Действия пользователя, ошибки и обработка событий. Успешные фоновые обновления списков исключены.",
-      columns: ["service", "message", "method", "route", "status", "requestId", "eventId"],
-      sort: [["@timestamp", "desc"]],
-      kibanaSavedObjectMeta: { searchSourceJSON: JSON.stringify({
-        indexRefName: "kibanaSavedObjectMeta.searchSourceJSON.index",
-        query: { language: "kuery", query: 'not (message : "http.request" and status < 400 and (method : (GET or HEAD) or route : "/internal/session" or route : "/unmatched"))' },
-        filter: [],
-      }) },
-    },
-    references: [{ type: "index-pattern", id: "cardo-logs", name: "kibanaSavedObjectMeta.searchSourceJSON.index" }],
-  }, "elastic", password);
+  await setupDiscover(kibana);
   const grafana = required("GRAFANA_URL");
   const admin = required("GRAFANA_ADMIN_PASSWORD");
   const existing = await call(grafana, "/api/users/lookup?loginOrEmail=student", "GET", undefined, "operator", admin, [404]);
