@@ -6,7 +6,7 @@
     "qa"
   ],
   "schemaVersion": 41,
-  "version": 4,
+  "version": 5,
   "editable": false,
   "refresh": "10s",
   "time": {
@@ -842,6 +842,7 @@
     {
       "id": 31,
       "title": "Последняя операция",
+      "description": "Дата и время последнего завершённого перевода или пополнения за всю историю, независимо от выбранного периода.",
       "type": "stat",
       "gridPos": {
         "x": 0,
@@ -879,7 +880,7 @@
             "uid": "cardo-operations"
           },
           "rawQuery": true,
-          "rawSql": "SELECT max(occurred_at) AS value FROM banking.operation_history",
+          "rawSql": "SELECT (extract(epoch FROM max(occurred_at))*1000)::float8 AS value FROM banking.operation_history",
           "format": "table",
           "editorMode": "code"
         }
