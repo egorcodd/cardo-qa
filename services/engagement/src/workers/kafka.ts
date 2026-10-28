@@ -5,11 +5,13 @@ import { events, eventType } from "../../../../packages/shared/metrics.ts";
 import { log, publicEvent } from "../../../../packages/shared/telemetry.ts";
 import { processEvent } from "../features/events.ts";
 import type { Pool } from "pg";
+import { watchConsumer } from "../../../../packages/shared/kafka-lifecycle.ts";
 
 export async function startEventConsumer(pool: Pool) {
   const kafka = kafkaClient("engagement");
   const consumer = kafka.consumer({ groupId: "cardo-engagement", allowAutoTopicCreation: false, sessionTimeout: 30000 });
   const producer = kafka.producer({ allowAutoTopicCreation: false });
+  const health = watchConsumer(consumer, "engagement", "cardo-engagement");
   await producer.connect();
   await consumer.connect();
   await consumer.subscribe({ topics: bankingTopics, fromBeginning: true });
@@ -41,5 +43,5 @@ export async function startEventConsumer(pool: Pool) {
     // KafkaJS resolves this message only after the handler returns. Its runner
     // also resolves transaction control records that never reach eachMessage.
   } });
-  return async () => { await consumer.stop(); await consumer.disconnect(); await producer.disconnect(); };
+  return async () => { health.close(); await consumer.stop(); await consumer.disconnect(); await producer.disconnect(); };
 }

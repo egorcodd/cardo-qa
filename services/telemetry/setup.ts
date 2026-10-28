@@ -47,26 +47,28 @@ async function setupDiscover(kibana: string) {
 
 if (process.argv[2] === "elastic") {
   await es("/_security/user/kibana_system/_password", "POST", { password: required("KIBANA_SYSTEM_PASSWORD") });
-  await es("/_security/role/cardo_writer", "PUT", { cluster: ["monitor"], indices: [{ names: ["cardo-logs", "cardo-logs-*"], privileges: ["create_doc"] }] });
-  await es("/_security/role/cardo_reader", "PUT", { cluster: [], indices: [{ names: ["cardo-logs-*"], privileges: ["read", "view_index_metadata"] }], applications: [{ application: "kibana-.kibana", privileges: ["feature_discover.read", "feature_dashboard.read"], resources: ["space:cardo"] }] });
+  await es("/_security/role/cardo_writer", "PUT", { cluster: ["monitor"], indices: [{ names: ["cardo-logs", "cardo-logs-*"], privileges: ["create_doc"] }, { names: ["cardo-events-*"], privileges: ["create_doc", "auto_configure"] }] });
+  await es("/_security/role/cardo_reader", "PUT", { cluster: [], indices: [{ names: ["cardo-logs-*", "cardo-events-*"], privileges: ["read", "view_index_metadata"] }], applications: [{ application: "kibana-.kibana", privileges: ["feature_discover.read", "feature_dashboard.read"], resources: ["space:cardo"] }] });
   await es("/_security/user/cardo_writer", "PUT", { password: required("ELASTIC_WRITER_PASSWORD"), roles: ["cardo_writer"] });
   await es("/_security/user/cardo_reader", "PUT", { password: required("ELASTIC_READER_PASSWORD"), roles: ["cardo_reader"] });
   await es("/_security/user/student", "PUT", { password: required("TOOLS_STUDENT_PASSWORD"), roles: ["cardo_reader"] });
   await es("/_ilm/policy/cardo-logs", "PUT", { policy: { phases: { hot: { actions: { rollover: { max_primary_shard_size: "256mb", max_age: "1d" } } }, delete: { min_age: "3d", actions: { delete: {} } } } } });
   const properties: Record<string, unknown> = { "@timestamp": { type: "date" } };
-  for (const field of ["service", "level", "message", "requestId", "eventId", "causationId", "notificationId", "operationId", "topic", "group", "errorCode", "offset", "currency", "method", "type", "route", "amount", "kind", "category"]) properties[field] = { type: "keyword", ignore_above: 200 };
+  for (const field of ["service", "level", "message", "requestId", "eventId", "causationId", "notificationId", "operationId", "topic", "group", "errorCode", "offset", "currency", "method", "type", "route", "amount", "kind", "category", "origin"]) properties[field] = { type: "keyword", ignore_above: 200 };
   for (const field of ["status", "durationMs", "partition", "attempt"]) properties[field] = { type: "long" };
   await es("/_index_template/cardo-logs", "PUT", { index_patterns: ["cardo-logs-*"], template: { settings: { number_of_shards: 1, number_of_replicas: 0, "index.lifecycle.name": "cardo-logs", "index.lifecycle.rollover_alias": "cardo-logs" }, mappings: { dynamic: "strict", properties } } });
   await es("/cardo-logs-000001", "PUT", { aliases: { "cardo-logs": { is_write_index: true } } }, [400]);
   // The template governs future indices; existing strict indices need the same
   // additive fields before producers start sending notification correlations.
   await es("/cardo-logs-*/_mapping", "PUT", { properties: Object.fromEntries(["causationId", "notificationId", "kind", "category"].map(field => [field, properties[field]])) });
+  await es("/_ilm/policy/cardo-events", "PUT", { policy: { phases: { hot: { actions: {} }, delete: { min_age: "30d", actions: { delete: {} } } } } });
+  await es("/_index_template/cardo-events", "PUT", { index_patterns: ["cardo-events-*"], template: { settings: { number_of_shards: 1, number_of_replicas: 0, "index.lifecycle.name": "cardo-events" }, mappings: { dynamic: "strict", properties } } });
 } else if (process.argv[2] === "discover") {
   await setupDiscover(required("KIBANA_URL"));
 } else if (process.argv[2] === "views") {
   const kibana = required("KIBANA_URL");
   await call(kibana, "/api/spaces/space", "POST", { id: "cardo", name: "Cardo", description: "Логи учебного банка Cardo", disabledFeatures: ["dev_tools", "advancedSettings", "stackAlerts", "savedObjectsManagement"] }, "elastic", password, [409]);
-  await call(kibana, "/s/cardo/api/data_views/data_view", "POST", { override: true, data_view: { id: "cardo-logs", name: "Cardo logs", title: "cardo-logs-*", timeFieldName: "@timestamp", allowNoIndex: false } }, "elastic", password);
+  await call(kibana, "/s/cardo/api/data_views/data_view", "POST", { override: true, data_view: { id: "cardo-logs", name: "Cardo logs and events", title: "cardo-logs-*,cardo-events-*", timeFieldName: "@timestamp", allowNoIndex: false } }, "elastic", password);
   await setupDiscover(kibana);
   const grafana = required("GRAFANA_URL");
   const admin = required("GRAFANA_ADMIN_PASSWORD");

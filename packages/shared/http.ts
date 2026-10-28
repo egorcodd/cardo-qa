@@ -143,7 +143,7 @@ export function listen(
       try {
         await cleanup();
         await flushLogs();
-        process.exitCode = 0;
+        process.exitCode ||= 0;
       } catch (error) {
         console.error(error);
         process.exitCode = 1;

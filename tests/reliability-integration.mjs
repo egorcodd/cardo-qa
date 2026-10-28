@@ -1,0 +1,53 @@
+import assert from 'node:assert/strict';
+import pg from 'pg';
+import { readFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
+import { acceptEvent, indexEvents } from '../services/telemetry/src/event-store.ts';
+import { migrate } from '../packages/shared/db.ts';
+
+assert.match(process.env.TEST_DATABASE_URL || '', /reliability/);
+const pool = new pg.Pool({ connectionString: process.env.TEST_DATABASE_URL });
+try {
+  assert.match((await pool.query('SELECT current_database() AS name')).rows[0].name,/^reliability/);
+  await pool.query("DROP SCHEMA IF EXISTS telemetry CASCADE; DROP SCHEMA IF EXISTS banking CASCADE; DO $$ BEGIN IF NOT EXISTS(SELECT FROM pg_roles WHERE rolname='cardo_grafana') THEN CREATE ROLE cardo_grafana; END IF; END $$; CREATE SCHEMA telemetry; CREATE SCHEMA banking; CREATE TABLE banking.outbox(id uuid PRIMARY KEY,payload jsonb);");
+  await migrate(pool, new URL('../services/telemetry/migrations/001-events.sql',import.meta.url));
+  await pool.query(await readFile(new URL('../services/banking/migrations/006-operation-history.sql',import.meta.url),'utf8'));
+  const e={eventId:randomUUID(),type:'banking.transfer.completed',occurredAt:'2026-10-26T12:00:00Z',requestId:'reliability-test',operationId:'tr-test',amount:'25.00',currency:'RUB',email:'private@example.test'};
+  const input={topic:'cardo.transfers.v1',partition:0,offset:'5',value:JSON.stringify(e)};
+  await acceptEvent(pool,input);
+  await acceptEvent(pool,input);
+  assert.equal((await pool.query('SELECT count(*)::int n FROM telemetry.events')).rows[0].n,1);
+  let body,attempt=0;
+  const send=async (_u,o)=>{body=o.body;return {ok:true,json:async()=>({items:[{create:{status:++attempt===1?503:201}}]})};};
+  await indexEvents(pool,'http://elastic.test','unused',send);
+  assert.equal((await pool.query('SELECT state FROM telemetry.events')).rows[0].state,'pending');
+  await pool.query("UPDATE telemetry.events SET next_attempt_at=now()");
+  await indexEvents(pool,'http://elastic.test','unused',send);
+  assert.equal((await pool.query('SELECT state FROM telemetry.events')).rows[0].state,'indexed');
+  assert.ok(!body.includes('private@example.test'));
+  await acceptEvent(pool,{...input,value:JSON.stringify({...e,amount:'26.00'})});
+  assert.equal((await pool.query('SELECT last_code FROM telemetry.events')).rows[0].last_code,'PAYLOAD_CONFLICT');
+  await acceptEvent(pool,{...input,offset:'6',value:'{private broken JSON'});
+  assert.equal((await pool.query("SELECT count(*)::int n FROM telemetry.events WHERE state='quarantine'")).rows[0].n,2);
+  await pool.query('INSERT INTO banking.outbox VALUES($1,$2)',[e.eventId,{id:e.eventId,type:e.type,occurredAt:e.occurredAt,requestId:e.requestId,payload:{senderOperationId:e.operationId,amount:e.amount,currency:e.currency,userId:'private-user'}}]);
+  await pool.query('GRANT USAGE ON SCHEMA banking,telemetry TO cardo_grafana');
+  const reader=await pool.connect();
+  await reader.query('SET ROLE cardo_grafana');
+  assert.equal((await reader.query('SELECT count(*)::int n FROM banking.operation_history')).rows[0].n,1);
+  assert.equal((await reader.query('SELECT amount FROM banking.operation_history')).rows[0].amount,'25.00');
+  assert.ok(!(await reader.query('SELECT * FROM banking.operation_history')).fields.some(f=>f.name.includes('user')));
+  for(const sql of ['SELECT * FROM banking.outbox','SELECT * FROM telemetry.events',"DELETE FROM banking.operation_history","INSERT INTO telemetry.events(id) VALUES('forbidden')"])
+    await assert.rejects(reader.query(sql),error=>error.code==='42501');
+  await reader.query('RESET ROLE');
+  reader.release();
+  const recovered={...input,origin:'recovered',offset:undefined,partition:undefined,value:JSON.stringify({...e,eventId:randomUUID()})};
+  await acceptEvent(pool,recovered);
+  const before=(await pool.query("SELECT * FROM telemetry.events WHERE origin='recovered'")).rows[0];
+  assert.equal(before.kafka_observed_at,null);
+  await acceptEvent(pool,{...recovered,origin:'live',offset:'17',partition:2});
+  const after=(await pool.query('SELECT * FROM telemetry.events WHERE id=$1',[before.id])).rows[0];
+  assert.ok(after.kafka_observed_at);
+  assert.equal(after.source_offset,'17');
+  assert.equal(after.state,'pending');
+  console.log(JSON.stringify({ok:true,checks:['SQL-before-ack','deduplication','per-item-retry','privacy','payload-conflict','poison-quarantine','restricted-history-view','recovery-provenance']}));
+} finally { await pool.end(); }

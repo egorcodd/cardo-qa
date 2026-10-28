@@ -6,11 +6,11 @@
     "qa"
   ],
   "schemaVersion": 41,
-  "version": 3,
+  "version": 4,
   "editable": false,
   "refresh": "10s",
   "time": {
-    "from": "now-24h",
+    "from": "now-7d",
     "to": "now"
   },
   "timezone": "browser",
@@ -21,8 +21,8 @@
       "description": "Число уникальных переводов внутри Cardo и в другие банки за последние 24 часа. Источник — события, сохранённые с операцией в PostgreSQL. Входящая проводка и комиссия не считаются отдельными переводами.",
       "type": "stat",
       "datasource": {
-        "type": "prometheus",
-        "uid": "cardo-prometheus"
+        "type": "grafana-postgresql-datasource",
+        "uid": "cardo-operations"
       },
       "gridPos": {
         "x": 0,
@@ -33,10 +33,14 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(cardo_completed_operations{kind=~\"transfer|external_transfer\",window=\"24h\"})",
-          "legendFormat": "{{service}}",
-          "instant": true,
-          "range": false
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "cardo-operations"
+          },
+          "rawQuery": true,
+          "rawSql": "SELECT count(*)::float8 AS value FROM banking.operation_history WHERE type LIKE 'banking.%transfer.completed' AND occurred_at>=now()-interval '24 hours'",
+          "format": "table",
+          "editorMode": "code"
         }
       ],
       "fieldConfig": {
@@ -67,8 +71,8 @@
       "description": "Уникальные пополнения за последние 24 часа. Повтор запроса с тем же Idempotency-Key не увеличивает число.",
       "type": "stat",
       "datasource": {
-        "type": "prometheus",
-        "uid": "cardo-prometheus"
+        "type": "grafana-postgresql-datasource",
+        "uid": "cardo-operations"
       },
       "gridPos": {
         "x": 6,
@@ -79,10 +83,14 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(cardo_completed_operations{kind=\"topup\",window=\"24h\"})",
-          "legendFormat": "{{service}}",
-          "instant": true,
-          "range": false
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "cardo-operations"
+          },
+          "rawQuery": true,
+          "rawSql": "SELECT count(*)::float8 AS value FROM banking.operation_history WHERE type='banking.top-up.completed' AND occurred_at>=now()-interval '24 hours'",
+          "format": "table",
+          "editorMode": "code"
         }
       ],
       "fieldConfig": {
@@ -113,8 +121,8 @@
       "description": "Все переводы, сохранённые с событием в базе стенда. Показатель переживает перезапуск сервисов; демонстрационная история исключена.",
       "type": "stat",
       "datasource": {
-        "type": "prometheus",
-        "uid": "cardo-prometheus"
+        "type": "grafana-postgresql-datasource",
+        "uid": "cardo-operations"
       },
       "gridPos": {
         "x": 12,
@@ -125,10 +133,14 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(cardo_completed_operations{kind=~\"transfer|external_transfer\",window=\"all\"})",
-          "legendFormat": "{{service}}",
-          "instant": true,
-          "range": false
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "cardo-operations"
+          },
+          "rawQuery": true,
+          "rawSql": "SELECT count(*)::float8 AS value FROM banking.operation_history WHERE type LIKE 'banking.%transfer.completed'",
+          "format": "table",
+          "editorMode": "code"
         }
       ],
       "fieldConfig": {
@@ -159,8 +171,8 @@
       "description": "Все пополнения, сохранённые с событием в базе. Завершение финансовой операции не гарантирует успешную обработку уведомления.",
       "type": "stat",
       "datasource": {
-        "type": "prometheus",
-        "uid": "cardo-prometheus"
+        "type": "grafana-postgresql-datasource",
+        "uid": "cardo-operations"
       },
       "gridPos": {
         "x": 18,
@@ -171,10 +183,14 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(cardo_completed_operations{kind=\"topup\",window=\"all\"})",
-          "legendFormat": "{{service}}",
-          "instant": true,
-          "range": false
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "cardo-operations"
+          },
+          "rawQuery": true,
+          "rawSql": "SELECT count(*)::float8 AS value FROM banking.operation_history WHERE type='banking.top-up.completed'",
+          "format": "table",
+          "editorMode": "code"
         }
       ],
       "fieldConfig": {
@@ -202,11 +218,11 @@
     {
       "id": 15,
       "title": "Когда совершались операции",
-      "description": "Уникальные события переводов и пополнений, дошедшие до Kafka и Kibana, по времени самой операции. Повтор одного eventId внутри интервала считается один раз. При задержке доставки график может появиться позже счётчика PostgreSQL. Доступная история ограничена сроком хранения логов.",
+      "description": "Сохранённые завершённые операции по часам за выбранный период. Ноль означает отсутствие операций, ошибка источника показывается как ошибка. Состояние Kafka проверяется отдельно ниже.",
       "type": "timeseries",
       "datasource": {
-        "type": "elasticsearch",
-        "uid": "cardo-elasticsearch"
+        "type": "grafana-postgresql-datasource",
+        "uid": "cardo-operations"
       },
       "gridPos": {
         "x": 0,
@@ -217,36 +233,14 @@
       "targets": [
         {
           "refId": "A",
-          "query": "service:telemetry AND message:\"event.observed\" AND topic:(\"cardo.transfers.v1\" OR \"cardo.topups.v1\")",
-          "metrics": [
-            {
-              "id": "1",
-              "type": "cardinality",
-              "field": "eventId"
-            }
-          ],
-          "bucketAggs": [
-            {
-              "id": "2",
-              "type": "terms",
-              "field": "type",
-              "settings": {
-                "size": "3",
-                "order": "desc",
-                "orderBy": "_term",
-                "min_doc_count": "1"
-              }
-            },
-            {
-              "id": "3",
-              "type": "date_histogram",
-              "field": "@timestamp",
-              "settings": {
-                "interval": "auto",
-                "min_doc_count": "0"
-              }
-            }
-          ]
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "cardo-operations"
+          },
+          "rawQuery": true,
+          "rawSql": "WITH buckets AS (SELECT generate_series(date_trunc('hour',to_timestamp($__unixEpochFrom())),to_timestamp($__unixEpochTo()),interval '1 hour') AS time), kinds AS (SELECT unnest(ARRAY['Переводы','Пополнения']) AS metric) SELECT b.time,k.metric,count(h.event_id)::float8 AS value FROM buckets b CROSS JOIN kinds k LEFT JOIN banking.operation_history h ON h.occurred_at>=b.time AND h.occurred_at<b.time+interval '1 hour' AND $__timeFilter(h.occurred_at) AND CASE WHEN h.type='banking.top-up.completed' THEN 'Пополнения' ELSE 'Переводы' END=k.metric GROUP BY b.time,k.metric ORDER BY b.time,k.metric",
+          "format": "time_series",
+          "editorMode": "code"
         }
       ],
       "fieldConfig": {
@@ -311,11 +305,11 @@
     {
       "id": 16,
       "title": "Последние завершённые операции",
-      "description": "До 20 уникальных финансовых операций в выбранном интервале, после доставки события через Kafka. Один eventId — одна строка, даже при повторной доставке. requestId позволяет найти цепочку в Kibana. Суммы показаны в валюте операции; персональные данные исключены.",
+      "description": "Последние 100 операций выбранного периода из постоянной истории. Пустая таблица при отсутствии операций в этом периоде ожидаема. Повтор Kafka не создаёт вторую строку.",
       "type": "table",
       "datasource": {
-        "type": "elasticsearch",
-        "uid": "cardo-elasticsearch"
+        "type": "grafana-postgresql-datasource",
+        "uid": "cardo-operations"
       },
       "gridPos": {
         "x": 0,
@@ -326,113 +320,25 @@
       "targets": [
         {
           "refId": "A",
-          "queryType": "dsl",
-          "query": "{\"size\":20,\"sort\":[{\"@timestamp\":\"desc\"}],\"collapse\":{\"field\":\"eventId\"},\"_source\":[\"@timestamp\",\"type\",\"amount\",\"currency\",\"operationId\",\"requestId\",\"eventId\"],\"query\":{\"bool\":{\"filter\":[{\"term\":{\"service\":\"telemetry\"}},{\"term\":{\"message\":\"event.observed\"}},{\"terms\":{\"topic\":[\"cardo.transfers.v1\",\"cardo.topups.v1\"]}},{\"range\":{\"@timestamp\":{\"gte\":\"$__from\",\"lte\":\"$__to\",\"format\":\"epoch_millis\"}}}]}}}",
-          "metrics": [
-            {
-              "id": "1",
-              "type": "raw_data",
-              "settings": {
-                "size": "20"
-              }
-            }
-          ],
-          "bucketAggs": []
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "cardo-operations"
+          },
+          "rawQuery": true,
+          "rawSql": "SELECT occurred_at AS \"Время\",CASE WHEN type='banking.top-up.completed' THEN 'Пополнение' ELSE 'Перевод' END AS \"Операция\",amount AS \"Сумма\",currency AS \"Валюта\",operation_id AS \"operationId\",request_id AS \"requestId\",event_id AS \"eventId\" FROM banking.operation_history WHERE $__timeFilter(occurred_at) ORDER BY occurred_at DESC,event_id DESC LIMIT 100",
+          "format": "table",
+          "editorMode": "code"
         }
       ],
-      "transformations": [
-        {
-          "id": "filterFieldsByName",
-          "options": {
-            "include": {
-              "names": [
-                "@timestamp",
-                "type",
-                "amount",
-                "currency",
-                "operationId",
-                "requestId"
-              ]
-            }
-          }
-        },
-        {
-          "id": "organize",
-          "options": {
-            "indexByName": {
-              "@timestamp": 0,
-              "type": 1,
-              "amount": 2,
-              "currency": 3,
-              "operationId": 4,
-              "requestId": 5
-            },
-            "renameByName": {
-              "@timestamp": "Время",
-              "type": "Операция",
-              "amount": "Сумма",
-              "currency": "Валюта",
-              "operationId": "ID операции",
-              "requestId": "requestId"
-            }
-          }
-        }
-      ],
+      "transformations": [],
       "fieldConfig": {
         "defaults": {
           "custom": {
             "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "filterable": true
+            "displayMode": "auto"
           }
         },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Операция"
-            },
-            "properties": [
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "type": "value",
-                    "options": {
-                      "banking.transfer.completed": {
-                        "text": "Перевод внутри Cardo"
-                      },
-                      "banking.external-transfer.completed": {
-                        "text": "Перевод в другой банк"
-                      },
-                      "banking.top-up.completed": {
-                        "text": "Пополнение"
-                      }
-                    }
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Время"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "dateTimeAsIso"
-              },
-              {
-                "id": "custom.width",
-                "value": 210
-              }
-            ]
-          }
-        ]
+        "overrides": []
       },
       "options": {
         "showHeader": true,
@@ -485,7 +391,8 @@
         "tooltip": {
           "mode": "multi"
         }
-      }
+      },
+      "timeFrom": "1h"
     },
     {
       "id": 5,
@@ -527,7 +434,8 @@
         "tooltip": {
           "mode": "multi"
         }
-      }
+      },
+      "timeFrom": "1h"
     },
     {
       "id": 6,
@@ -569,7 +477,8 @@
         "tooltip": {
           "mode": "multi"
         }
-      }
+      },
+      "timeFrom": "1h"
     },
     {
       "id": 7,
@@ -643,7 +552,8 @@
         "colorMode": "value",
         "graphMode": "none",
         "wideLayout": true
-      }
+      },
+      "timeFrom": "1h"
     },
     {
       "id": 2,
@@ -685,7 +595,8 @@
         "tooltip": {
           "mode": "multi"
         }
-      }
+      },
+      "timeFrom": "1h"
     },
     {
       "id": 9,
@@ -727,7 +638,8 @@
         "tooltip": {
           "mode": "multi"
         }
-      }
+      },
+      "timeFrom": "1h"
     },
     {
       "id": 10,
@@ -770,7 +682,8 @@
         "tooltip": {
           "mode": "multi"
         }
-      }
+      },
+      "timeFrom": "1h"
     },
     {
       "id": 8,
@@ -812,7 +725,8 @@
         "tooltip": {
           "mode": "multi"
         }
-      }
+      },
+      "timeFrom": "1h"
     },
     {
       "id": 17,
@@ -875,7 +789,8 @@
         "colorMode": "value",
         "graphMode": "none",
         "wideLayout": true
-      }
+      },
+      "timeFrom": "1h"
     },
     {
       "id": 18,
@@ -921,7 +836,225 @@
         "colorMode": "value",
         "graphMode": "none",
         "wideLayout": true
-      }
+      },
+      "timeFrom": "1h"
+    },
+    {
+      "id": 31,
+      "title": "Последняя операция",
+      "type": "stat",
+      "gridPos": {
+        "x": 0,
+        "y": 53,
+        "w": 6,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dateTimeAsIso",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "colorMode": "value"
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "cardo-operations"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "cardo-operations"
+          },
+          "rawQuery": true,
+          "rawSql": "SELECT max(occurred_at) AS value FROM banking.operation_history",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ]
+    },
+    {
+      "id": 32,
+      "title": "Обработчики Kafka готовы (норма 2)",
+      "type": "stat",
+      "gridPos": {
+        "x": 6,
+        "y": 53,
+        "w": 6,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "colorMode": "value"
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "cardo-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(cardo_kafka_consumer_ready)",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cardo-prometheus"
+          }
+        }
+      ],
+      "timeFrom": "1h"
+    },
+    {
+      "id": 33,
+      "title": "Событий ожидают индексации",
+      "type": "stat",
+      "gridPos": {
+        "x": 12,
+        "y": 53,
+        "w": 6,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "colorMode": "value"
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "cardo-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(cardo_event_index_pending)",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cardo-prometheus"
+          }
+        }
+      ],
+      "timeFrom": "1h"
+    },
+    {
+      "id": 34,
+      "title": "Событий в карантине",
+      "type": "stat",
+      "gridPos": {
+        "x": 18,
+        "y": 53,
+        "w": 6,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "colorMode": "value"
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "cardo-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(cardo_event_quarantined)",
+          "instant": true,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cardo-prometheus"
+          }
+        }
+      ],
+      "timeFrom": "1h"
+    },
+    {
+      "id": 35,
+      "title": "Доставка событий: Kafka и восстановление",
+      "description": "Последнее получение показывает фактическое чтение Kafka. Восстановленные записи сохраняют исходную дату и не считаются новым чтением Kafka. Пустое время получения означает, что тема пока не была прочитана.",
+      "type": "table",
+      "gridPos": {
+        "x": 0,
+        "y": 57,
+        "w": 24,
+        "h": 6
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "cardo-operations"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "cardo-operations"
+          },
+          "rawQuery": true,
+          "rawSql": "SELECT topic AS \"Тема\",pending AS \"Ожидают\",quarantined AS \"Карантин\",recovered AS \"Восстановлены\",last_observed_at AS \"Последнее чтение Kafka\",oldest_pending_at AS \"Самое старое ожидание\" FROM telemetry.pipeline ORDER BY topic",
+          "format": "table",
+          "editorMode": "code"
+        }
+      ]
     }
   ]
 }

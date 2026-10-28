@@ -15,6 +15,7 @@ export function database(owner: string) {
         "_dev@127.0.0.1:5434/cardo",
     max: 10,
     connectionTimeoutMillis: 5000,
+    statement_timeout: owner === "telemetry" ? 10000 : undefined,
   });
 }
 export async function transaction<T>(
@@ -37,7 +38,7 @@ export async function transaction<T>(
 export async function migrate(pool: pg.Pool, file: URL) {
   const directory = path.dirname(fileURLToPath(file));
   const owner = path.basename(path.dirname(directory));
-  if (!["customer", "banking", "engagement", "rates"].includes(owner))
+  if (!["customer", "banking", "engagement", "rates", "telemetry"].includes(owner))
     throw new Error("Unknown migration owner");
   const files = (await readdir(directory))
     .filter((name) => /^\d{3}-[\w-]+\.sql$/.test(name))

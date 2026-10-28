@@ -4,10 +4,12 @@ import { startWorker } from "../../../../packages/shared/worker.ts";
 import { kafkaClient, kafkaEnabled, operationTopics } from "../../../../packages/shared/kafka.ts";
 import { backlog, events, eventType } from "../../../../packages/shared/metrics.ts";
 import { log, publicEvent } from "../../../../packages/shared/telemetry.ts";
+import { producerRecovery } from "../../../../packages/shared/kafka-lifecycle.ts";
 
 export async function startOutbox(pool: Pool, engagement: string) {
   const producer = kafkaEnabled() ? kafkaClient("banking").producer({ transactionalId: "cardo-banking-outbox", idempotent: true, maxInFlightRequests: 1, allowAutoTopicCreation: false }) : null;
   if (producer) await producer.connect();
+  const recovery = producerRecovery("banking");
   const stop = startWorker(async () => {
     try {
       const pending = (await pool.query("SELECT count(*)::int AS count FROM banking.outbox WHERE delivered_at IS NULL")).rows[0].count;
@@ -31,9 +33,11 @@ export async function startOutbox(pool: Pool, engagement: string) {
             if (!response.ok && !(response.status === 500 && row.payload.type === "banking.top-up.completed" && /\.25$/.test(String(row.payload.payload.amount)))) throw new Error("EVENT_DELIVERY_FAILED");
           }
           await pool.query("UPDATE banking.outbox SET delivered_at=now(),last_error=NULL WHERE id=$1", [row.id]);
+          recovery.success();
           events.inc({ service: "banking", type: eventType(row.payload.type), stage: "publish", result: "ok" });
           log("banking", "info", "event.published", { ...projection, topic: producer ? operationTopics(row.payload.type).internal : "http" });
-        } catch {
+        } catch (error) {
+          if (producer) recovery.failure(error);
           await pool.query("UPDATE banking.outbox SET last_error=$2,next_attempt_at=now()+make_interval(secs=>$3) WHERE id=$1", [row.id, "EVENT_DELIVERY_FAILED", Math.min(300, 2 ** Math.min(row.attempts, 8))]);
           events.inc({ service: "banking", type: eventType(row.payload.type), stage: "publish", result: "error" });
           log("banking", "error", "event.retry", { ...projection, attempt: row.attempts, errorCode: "EVENT_DELIVERY_FAILED" });

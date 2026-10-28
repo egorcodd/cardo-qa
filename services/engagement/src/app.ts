@@ -7,12 +7,13 @@ import { createPushRoutes } from "./features/push.ts";
 import { createMembershipRoutes } from "./features/membership.ts";
 import { createPreferencesRoutes } from "./features/preferences.ts";
 import { createRemindersRoutes } from "./features/reminders.ts";
+import { kafkaReady } from "../../../packages/shared/kafka-lifecycle.ts";
 
 export function createEngagementApp(pool: Pool, publicKey: string) {
   const app = service("engagement");
   app.get("/health", route(async (_req, res) => {
     await pool.query("SELECT 1");
-    res.json({ status: "ok", service: "engagement" });
+    res.status(kafkaReady() ? 200 : 503).json({ status: kafkaReady() ? "ok" : "recovering", service: "engagement" });
   }));
   app.use(internal);
   app.use(createEventsRoutes(pool));

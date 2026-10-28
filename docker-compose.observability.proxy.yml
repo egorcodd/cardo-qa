@@ -17,6 +17,8 @@ x-required-secrets:
   kibana-objects-key: ${KIBANA_SAVED_OBJECTS_KEY:?Set a private encryption key}
   kibana-report-key: ${KIBANA_REPORTING_KEY:?Set a private encryption key}
   student: ${TOOLS_STUDENT_PASSWORD:?Set the shared readonly password}
+  history-reader: ${GRAFANA_HISTORY_PASSWORD:?Set a private history reader password}
+  telemetry-database: ${TELEMETRY_DATABASE_URL:?Set a private telemetry database connection}
 services:
   kafka:
     mem_limit: 1024m
@@ -28,10 +30,12 @@ services:
       ES_JAVA_OPTS: -Xms512m -Xmx512m
   telemetry:
     mem_limit: 256m
+    environment:
+      GRAFANA_HEALTH_URL: http://grafana:3000/tools/grafana/api/health
   prometheus:
     mem_limit: 256m
   grafana:
-    mem_limit: 384m
+    mem_limit: 1g
     environment:
       GF_SERVER_ROOT_URL: ${CARDO_TOOLS_ORIGIN:?Set the existing Cardo HTTPS origin}/tools/grafana/
       GF_SERVER_SERVE_FROM_SUB_PATH: "true"

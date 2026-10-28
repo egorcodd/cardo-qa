@@ -23,6 +23,7 @@ x-app: &app
 services:
   postgres:
     image: postgres:17-alpine
+    restart: unless-stopped
     logging: *logs
     environment:
       POSTGRES_USER: cardo

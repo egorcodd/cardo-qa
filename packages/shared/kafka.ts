@@ -1,5 +1,6 @@
 import { Kafka, logLevel } from "kafkajs";
 import { log } from "./telemetry.ts";
+import { kafkaErrorCode } from "./kafka-lifecycle.ts";
 
 export const topics = {
   legacyBanking: "cardo.banking.events.v1",
@@ -23,5 +24,5 @@ export function kafkaClient(service: string) {
   const username = process.env.KAFKA_USERNAME;
   const password = process.env.KAFKA_PASSWORD;
   if (!brokers?.length || !username || !password) throw new Error("KAFKA_CONFIG_REQUIRED");
-  return new Kafka({ clientId: "cardo-" + service, brokers, sasl: { mechanism: "plain", username, password }, connectionTimeout: 5000, requestTimeout: 10000, retry: { retries: 5, initialRetryTime: 500 }, logLevel: logLevel.ERROR, logCreator: () => () => log(service, "error", "kafka.connection", { errorCode: "KAFKA_CONNECTION" }) });
+  return new Kafka({ clientId: "cardo-" + service, brokers, sasl: { mechanism: "plain", username, password }, connectionTimeout: 5000, requestTimeout: 10000, retry: { retries: 5, initialRetryTime: 500 }, logLevel: logLevel.ERROR, logCreator: () => entry => log(service, "error", "kafka.connection", { errorCode: kafkaErrorCode(entry.log.error) }) });
 }
